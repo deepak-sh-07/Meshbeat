@@ -1,0 +1,135 @@
+body{
+    margin: 0px;
+    padding: 0px;
+    font-family: "Poppins", sans-serif;
+}
+.container{
+    height: 100vh;
+    width: 100vw;
+    background-color: rgb(49, 26, 27);
+}
+.title{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 31px;
+    padding-top: 15px;
+}
+.code{
+    margin: 5px 0px 0px 20px;
+    color: white;
+    font-size: 20px;
+}
+
+.code input {
+  height: 25px; 
+  width: 96%;
+  margin: 10px auto; 
+  display: block;
+  padding: 8px 12px; 
+  border: 1px solid #444; 
+  border-radius: 6px; 
+  background-color: rgb(69, 38, 39);
+  color: #f5f5f5;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.code input:focus {
+  border-color: #a855f7; /* purple highlight */
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.6);
+  background-color: rgb(60, 32, 34);
+}
+.generate {
+  background-color: rgb(64, 18, 21);
+  width: 93%;
+  height: 48px;
+  margin: 14px 5px 10px 26px;
+  border-radius: 10px; /* softer rounding */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px; /* consistent internal spacing */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); /* subtle depth */
+}
+
+.text {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.generate button {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* space between icon and text */
+  padding: 0 16px;
+  background: linear-gradient(135deg, #666, #333);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  height: 32px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+}
+
+.generate button img {
+  width: 16px;
+  height: 16px;
+}
+
+.generate button:hover {
+  background: linear-gradient(135deg, #777, #222);
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.generate button:active {
+  transform: scale(0.95);
+}
+.buttons{
+  display: flex;
+  align-items: center;    
+  justify-content: center;
+  margin-top: 20px;
+}
+.buttons button {
+  display: flex;
+  align-items: center;    /* vertically center icon + text */
+  justify-content: center;/* center content horizontally */
+  gap: 10px;              /* space between icon and text */
+  background: linear-gradient(135deg, #fc1717, #d60000);
+  height: 45px;
+  padding: 0 20px;        /* use padding instead of fixed width */
+  min-width: 227px;       /* keeps buttons reasonably wide */
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  box-sizing: border-box;
+}
+
+/* tighten and normalize the icon */
+.buttons button img {
+  width: 18px;            /* icon width */
+  height: 18px;           /* icon height */
+  display: block;         /* remove inline descender offset */
+  object-fit: contain;
+  margin: 0;
+}
+
+.buttons button:hover {
+  background: linear-gradient(135deg, #ff3333, #b80000);
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.buttons button:active {
+  transform: scale(0.96);
+}

@@ -1,0 +1,125 @@
+body{
+    margin: 0px;
+    padding: 0px;
+    font-family: "Poppins", sans-serif;
+}
+.container {
+  height: 50vh;
+  width: 100vw;
+  background-image: url("/download.png");
+  background-size: cover;      /* makes it cover the whole div */
+  background-position: center; /* keeps it centered */
+  background-repeat: no-repeat;/* prevents tiling */
+}
+
+
+.second{
+    background-color: rgb(29, 28, 28);
+   
+    height: 50vh;
+    width: 100vw;
+}
+.title{
+    color: antiquewhite;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    font-weight: 600;
+}
+.d1, .d2{
+    color: rgb(145, 137, 124);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.buttons {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;   /* stack buttons vertically */
+  justify-content: center;  /* center vertically inside parent */
+  align-items: center;      /* center horizontally */
+  gap: 10px;                /* space between buttons */
+}
+
+
+/* Buttons */
+.buttons button {
+  display: flex;
+  align-items: center;    /* vertically center icon + text */
+  justify-content: center;/* center content horizontally */
+  gap: 10px;              /* space between icon and text */
+  background: linear-gradient(135deg, #fc1717, #d60000);
+  height: 45px;
+  padding: 0 20px;        /* use padding instead of fixed width */
+  min-width: 227px;       /* keeps buttons reasonably wide */
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  box-sizing: border-box;
+}
+
+/* tighten and normalize the icon */
+.buttons button img {
+  width: 18px;            /* icon width */
+  height: 18px;           /* icon height */
+  display: block;         /* remove inline descender offset */
+  object-fit: contain;
+  margin: 0;
+}
+
+.buttons button:hover {
+  background: linear-gradient(135deg, #ff3333, #b80000);
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.buttons button a{
+  text-decoration: none;
+  color: white;
+}
+.buttons button:active {
+  transform: scale(0.96);
+}
+.buttons button:nth-child(2) {
+  background: linear-gradient(135deg, #3e3f41, #444546); /* example blue gradient */
+}
+
+.buttons button:nth-child(2):hover {
+  background: linear-gradient(135deg, #5e6167, #525356);
+}
+.signout{
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+}
+.signout button {
+  display: flex;
+  align-items: center;    /* vertically center icon + text */
+  justify-content: center;/* center content horizontally */
+  gap: 10px;              /* space between icon and text */
+  background: linear-gradient(135deg, #fc1717, #d60000);
+  padding: 0 20px;        /* use padding instead of fixed width */
+  min-width: 108px;
+    height: 31px;       /* keeps buttons reasonably wide */
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  box-sizing: border-box;
+}
+.signout button:hover {
+  background: linear-gradient(135deg, #ff3333, #b80000);
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.signout button:active {
+  transform: scale(0.96);
+}
