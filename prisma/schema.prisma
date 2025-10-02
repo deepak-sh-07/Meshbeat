@@ -1,37 +1,36 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  password    String
-  name        String?
-
-  hostedRoom  Room?    @relation("HostRoom")
-  participant Room?    @relation("ParticipantRoom", fields: [participantRoomId], references: [id])
-  participantRoomId String?   // 👈 required, but no @unique
-
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String
+  name              String?
+  participantRoomId String?
+  createdAt         DateTime @default(now())
+  hostedRoom        Room?    @relation("HostRoom")
+  participant       Room?    @relation("ParticipantRoom", fields: [participantRoomId], references: [id])
 
   @@map("user")
 }
 
-
 model Room {
   id           String   @id @default(cuid())
-  name         String
   code         String   @unique
   hostId       String   @unique
-  host         User     @relation("HostRoom", fields: [hostId], references: [id])
-  participants User[]   @relation("ParticipantRoom")
-  tracks       Track[]
   createdAt    DateTime @default(now())
+  name         String
+  host         User     @relation("HostRoom", fields: [hostId], references: [id])
+  tracks       Track[]
+  participants User[]   @relation("ParticipantRoom")
 
-    @@map("room")   // 👈 force lowercase
+  @@map("room")
 }
 
 model Track {
@@ -40,12 +39,8 @@ model Track {
   artist    String?
   url       String
   roomId    String
-  room      Room     @relation(fields: [roomId], references: [id])
   createdAt DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id])
 
-  @@map("track")   // 👈 force lowercase
+  @@map("track")
 }
-
-
-
-
