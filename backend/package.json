@@ -7,9 +7,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start -p $PORT"
+  "dev": "node server.js",
+  "build": "echo 'no build needed for backend'",
+  "start": "node server.js"
 },
   "engines": {
     "node": "20.x"
