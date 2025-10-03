@@ -1,12 +1,14 @@
 console.log("🚀 Starting server...");
-console.log("PORT:", process.env.PORT || 3001);
 console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
 console.log("AWS_BUCKET_NAME:", process.env.AWS_BUCKET_NAME ? "set" : "missing");
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-const PORT = process.env.PORT || 3001;
-
+const PORT = process.env.PORT ;
+if (!PORT) {
+  console.error("❌ PORT env variable not set!");
+  process.exit(1);
+}
 // HTTP server with a simple response for health check
 const httpServer = createServer((req, res) => {
   res.writeHead(200);
