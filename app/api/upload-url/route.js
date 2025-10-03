@@ -1,8 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// ❌ Don't check env vars here at the top-level (causes build-time crash)
-
 function getS3Client() {
   if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
     throw new Error("❌ Missing AWS credentials in environment variables");
@@ -22,7 +20,7 @@ function getS3Client() {
 
 export async function GET(req) {
   try {
-    const s3 = getS3Client(); // ✅ Create client at runtime, after env vars are available
+    const s3 = getS3Client(); // ✅ runtime only
 
     const { searchParams } = new URL(req.url);
     const fileName = searchParams.get("fileName");
@@ -31,18 +29,18 @@ export async function GET(req) {
     const fileType = searchParams.get("fileType");
 
     if (!fileName || !roomId) {
-      return Response.json({ error: "Missing params" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing params" }), { status: 400 });
     }
 
     let command;
 
     if (action === "upload") {
       if (!fileType) {
-        return Response.json({ error: "Missing fileType for upload" }, { status: 400 });
+        return new Response(JSON.stringify({ error: "Missing fileType for upload" }), { status: 400 });
       }
       command = new PutObjectCommand({
         Bucket: process.env.AWS_BUCKET_NAME,
-        Key: `${roomId}/${fileName}`,
+        Key: `${roomId}/${fileName}`, // ✅ backticks inside handler
         ContentType: fileType,
       });
     } else if (action === "download") {
@@ -51,16 +49,16 @@ export async function GET(req) {
         Key: `${roomId}/${fileName}`,
       });
     } else {
-      return Response.json({ error: "Invalid action" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400 });
     }
 
     const url = await getSignedUrl(s3, command, { expiresIn: 60 });
-    return Response.json({ url });
-  } catch (err) {
-    console.error("❌ Signed URL error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ url }), {
+      status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  } catch (err) {
+    console.error("❌ Signed URL error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
