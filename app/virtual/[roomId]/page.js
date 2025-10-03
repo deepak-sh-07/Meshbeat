@@ -248,6 +248,7 @@ export default function Virtual() {
       const data = await res.json();
       if (!data.url) throw new Error("Failed to get upload URL");
 
+      console.log("Pre-signed URL:", data.url);
       // 2️⃣ Directly PUT to S3
       const putRes = await fetch(data.url, {
         method: "PUT",
