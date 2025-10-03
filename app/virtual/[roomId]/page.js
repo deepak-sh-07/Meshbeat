@@ -38,7 +38,7 @@ export default function Virtual() {
   useEffect(() => {
     if (!roomId || tracks.length === 0) return;
 
-    const socket = io("http://localhost:3001");
+    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL);
     socketRef.current = socket;
 
     socket.on("connect", () => {
