@@ -121,6 +121,7 @@ export default function Virtual() {
 
   // Play or semi-play
   const semiplay = (index, x) => {
+    if (!ishost) return;
     if (tracks.length === 0) return;
     const newProgress = x === -1 ? 0 : progress;
     const plannedStart = Date.now() + 2000; // 2s global delay
