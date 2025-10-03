@@ -1,3 +1,7 @@
+console.log("🚀 Starting server...");
+console.log("PORT:", process.env.PORT || 3001);
+console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
+console.log("AWS_BUCKET_NAME:", process.env.AWS_BUCKET_NAME ? "set" : "missing");
 import { createServer } from "http";
 import { Server } from "socket.io";
 
