@@ -234,27 +234,31 @@ export default function Virtual() {
   };
 
   const uploadFile = async () => {
-    if (!ishost) return alert("Only host can upload songs");
-    if (!file || file.length === 0) return alert("Please select files");
+  if (!ishost) return alert("Only host can upload songs");
+  if (!file || file.length === 0) return alert("Please select files");
 
-    try {
-      for (let i = 0; i < file.length; i++) {
-        const f = file[i];
-        const res = await fetch(
-          `/api/upload-url?fileName=${f.name}&fileType=${f.type}&roomId=${roomId}&action=upload`
-        );
-        const data = await res.json();
-        await fetch(data.url, {
-          method: "PUT",
-          headers: { "Content-Type": f.type },
-          body: f,
-        });
-      }
-      fetchTracks();
-    } catch (err) {
-      console.error("Upload Error:", err);
+  try {
+    for (let f of file) {
+      const res = await fetch(
+        `/api/upload-url?fileName=${f.name}&fileType=${f.type}&roomId=${roomId}&action=upload`
+      );
+      const data = await res.json();
+
+      await fetch(data.url, {
+        method: "PUT",
+        headers: { "Content-Type": f.type },
+        body: f,
+      });
+
+      console.log(`${f.name} uploaded`);
     }
-  };
+    fetchTracks();
+  } catch (err) {
+    console.error("Upload Error:", err);
+    alert("Upload failed");
+  }
+};
+
   async function deleteTrack(trackId) {
   const res = await fetch("/api/delete-track", {
     method: "DELETE",
