@@ -238,26 +238,32 @@ export default function Virtual() {
   if (!file || file.length === 0) return alert("Please select files");
 
   try {
-    for (let f of file) {
+    for (let i = 0; i < file.length; i++) {
+      const f = file[i];
       const res = await fetch(
-        `/api/upload-url?fileName=${f.name}&fileType=${f.type}&roomId=${roomId}&action=upload`
+        `/api/upload-url?fileName=${encodeURIComponent(f.name)}&fileType=${f.type}&roomId=${roomId}&action=upload`
       );
       const data = await res.json();
 
-      await fetch(data.url, {
+      const putRes = await fetch(data.url, {
         method: "PUT",
         headers: { "Content-Type": f.type },
         body: f,
       });
 
-      console.log(`${f.name} uploaded`);
+      if (!putRes.ok) {
+        console.error("Upload failed!", putRes.status, await putRes.text());
+        alert(`Upload failed: ${putRes.status}`);
+      } else {
+        console.log("Upload succeeded:", f.name);
+      }
     }
     fetchTracks();
   } catch (err) {
     console.error("Upload Error:", err);
-    alert("Upload failed");
   }
 };
+
 
   async function deleteTrack(trackId) {
   const res = await fetch("/api/delete-track", {
