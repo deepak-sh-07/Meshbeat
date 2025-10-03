@@ -1,9 +1,11 @@
 // server.js
-console.log("🚀 PORT being used:", process.env.PORT);
+console.log("🚀 Starting server...");
+console.log("📦 Full Environment Variables:", process.env);
+console.log("📦 PORT provided by Railway:", process.env.PORT);
+
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-console.log("🚀 Starting server...");
 
 // Check required AWS env variables
 console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
