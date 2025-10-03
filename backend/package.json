@@ -7,8 +7,10 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  },
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start -p $PORT"
+},
   "engines": {
     "node": "20.x"
   },

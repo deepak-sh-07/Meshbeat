@@ -1,3 +1,4 @@
+// app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
@@ -5,15 +6,19 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-const authOptions = {
+export const authOptions = {
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) {
+          throw new Error("Email and password required");
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
@@ -31,19 +36,26 @@ const authOptions = {
       },
     }),
   ],
-  session: { strategy: "jwt" }, // ✅ keep JWT
+
+  session: {
+    strategy: "jwt", // Use JWT in production
+  },
+
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.id = user.id; // Add user ID to JWT
+      if (user) token.id = user.id;
       return token;
     },
     async session({ session, token }) {
-      if (token?.id) session.user.id = token.id; // Add user ID to session
+      if (token?.id) session.user.id = token.id;
       return session;
     },
   },
+
+  // ✅ Production secret from environment variables
   secret: process.env.NEXTAUTH_SECRET,
 };
 
+// Export handler for Next.js App Router (Next.js 13+)
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
