@@ -3,13 +3,17 @@ import { Server } from "socket.io";
 
 const PORT = process.env.PORT || 3001;
 
-const httpServer = createServer();
+// HTTP server with a simple response for health check
+const httpServer = createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Server is running");
+});
 
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "http://localhost:3000", 
-      "https://meshbeat.vercel.app" // <-- replace with your real Vercel domain
+      "http://localhost:3000",
+      "https://meshbeat.vercel.app"
     ],
     methods: ["GET", "POST"],
   },
@@ -24,12 +28,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("song-info", ({ index, progress, plannedStart, roomId }) => {
-    console.log(`Song info received from ${socket.id} for room ${roomId}`);
     io.in(roomId).emit("song-info", { index, progress, plannedStart });
   });
 
   socket.on("pause", ({ roomId }) => {
-    console.log(`Pause received from ${socket.id} for room ${roomId}`);
     io.in(roomId).emit("pause");
   });
 
