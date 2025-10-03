@@ -240,27 +240,31 @@ export default function Virtual() {
   try {
     for (let i = 0; i < file.length; i++) {
       const f = file[i];
+
+      // 1️⃣ Request signed URL
       const res = await fetch(
-        `/api/upload-url?fileName=${encodeURIComponent(f.name)}&fileType=${f.type}&roomId=${roomId}&action=upload`
+        `/api/upload-url?fileName=${encodeURIComponent(f.name)}&fileType=${encodeURIComponent(f.type)}&roomId=${roomId}`
       );
       const data = await res.json();
+      if (!data.url) throw new Error("Failed to get upload URL");
 
+      // 2️⃣ Directly PUT to S3
       const putRes = await fetch(data.url, {
         method: "PUT",
         headers: { "Content-Type": f.type },
         body: f,
       });
 
-      if (!putRes.ok) {
-        console.error("Upload failed!", putRes.status, await putRes.text());
-        alert(`Upload failed: ${putRes.status}`);
-      } else {
-        console.log("Upload succeeded:", f.name);
-      }
+      if (!putRes.ok) throw new Error("S3 upload failed");
     }
+
+    // 3️⃣ Refresh tracks list
     fetchTracks();
+    setFile([]);
+    alert("Upload complete ✅");
   } catch (err) {
     console.error("Upload Error:", err);
+    alert("Upload failed: " + err.message);
   }
 };
 
