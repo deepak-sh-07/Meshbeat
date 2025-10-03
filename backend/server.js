@@ -1,30 +1,38 @@
-console.log("🚀 Starting server...");
-console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
-console.log("AWS_BUCKET_NAME:", process.env.AWS_BUCKET_NAME ? "set" : "missing");
+// server.js
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-const PORT = process.env.PORT ;
+console.log("🚀 Starting server...");
+
+// Check required AWS env variables
+console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
+console.log("AWS_BUCKET_NAME:", process.env.AWS_BUCKET_NAME ? "set" : "missing");
+
+// Use Railway's dynamic port
+const PORT = process.env.PORT;
 if (!PORT) {
-  console.error("❌ PORT env variable not set!");
+  console.error("❌ PORT env variable not set! Railway should inject this automatically.");
   process.exit(1);
 }
-// HTTP server with a simple response for health check
+
+// Create HTTP server with a simple health endpoint
 const httpServer = createServer((req, res) => {
-  res.writeHead(200);
-  res.end("Server is running");
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Server is running ✅");
 });
 
+// Setup Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "http://localhost:3000",
-      "https://meshbeat.vercel.app"
+      "http://localhost:3000",       // your local frontend
+      "https://meshbeat.vercel.app"  // deployed frontend
     ],
     methods: ["GET", "POST"],
   },
 });
 
+// Socket.IO events
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -46,6 +54,7 @@ io.on("connection", (socket) => {
   });
 });
 
+// Listen on Railway's PORT
 httpServer.listen(PORT, () => {
-  console.log(`Socket.IO server running on port ${PORT}`);
+  console.log(`✅ Socket.IO server running on Railway port ${PORT}`);
 });
