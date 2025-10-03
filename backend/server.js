@@ -1,4 +1,5 @@
 // server.js
+console.log("🚀 PORT being used:", process.env.PORT);
 import { createServer } from "http";
 import { Server } from "socket.io";
 
