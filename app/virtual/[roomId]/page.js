@@ -155,14 +155,14 @@ export default function Virtual() {
     setStop(true);
 
     // Drift correction
-    if (audio.driftCheck) clearInterval(audio.driftCheck);
-    audio.driftCheck = setInterval(() => {
-      const expected = startTime + (Date.now() - plannedStart) / 1000;
-      const diff = Math.abs(audio.currentTime - expected);
-      if (diff > 0.3 && !audio.paused) {
-        audio.currentTime = expected;
-      }
-    }, 3000);
+    // if (audio.driftCheck) clearInterval(audio.driftCheck);
+    // audio.driftCheck = setInterval(() => {
+    //   const expected = startTime + (Date.now() - plannedStart) / 1000;
+    //   const diff = Math.abs(audio.currentTime - expected);
+    //   if (diff > 0.3 && !audio.paused) {
+    //     audio.currentTime = expected;
+    //   }
+    // }, 3000);
 
     audio.onended = () => clearInterval(audio.driftCheck);
   };
