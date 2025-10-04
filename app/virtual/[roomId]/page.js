@@ -126,7 +126,7 @@ export default function Virtual() {
     if (!ishost) return;
     if (tracks.length === 0) return;
     const newProgress = x === -1 ? 0 : progress;
-    const plannedStart = Date.now() + 9000; // 2s global delay
+    const plannedStart = Date.now() + 3000; // 2s global delay
 
     socketRef.current.emit("song-info", {
       index,
