@@ -73,16 +73,7 @@ export default function Virtual() {
       console.error("Fetch Tracks Error:", err);
     }
   };
-  const unlockAudio = () => {
-  if (audioRef.current) {
-    audioRef.current.muted = true;
-    audioRef.current.play().then(() => {
-      audioRef.current.pause();
-      audioRef.current.muted = false;
-      setUnlocked(true);
-    });
-  }
-};
+  
 
   // Fetch room info
   const fetchRoomInfo = async () => {
@@ -303,7 +294,16 @@ export default function Virtual() {
     const seconds = Math.floor(time % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   };
-
+const unlockAudio = () => {
+  if (audioRef.current) {
+    audioRef.current.muted = true;
+    audioRef.current.play().then(() => {
+      audioRef.current.pause();
+      audioRef.current.muted = false;
+      setUnlocked(true);
+    });
+  }
+};
 
   // ---------- UI ----------
   return (
