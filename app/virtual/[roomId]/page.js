@@ -164,7 +164,7 @@ export default function Virtual() {
     //   }
     // }, 3000);
 
-    audio.onended = () => clearInterval(audio.driftCheck);
+    // audio.onended = () => clearInterval(audio.driftCheck);
   };
 
   // Pause
