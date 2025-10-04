@@ -296,14 +296,23 @@ export default function Virtual() {
   };
 const unlockAudio = () => {
   if (audioRef.current) {
+    audioRef.current.src = "/silencer.mp3"; // Set the silent track
     audioRef.current.muted = true;
-    audioRef.current.play().then(() => {
-      audioRef.current.pause();
-      audioRef.current.muted = false;
-      setUnlocked(true);
-    });
+    audioRef.current.play()
+      .then(() => {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src"); // Clear the source
+        audioRef.current.load(); // Reset the <audio> element
+        audioRef.current.muted = false;
+        setUnlocked(true); // Unlock audio
+      })
+      .catch(err => {
+        console.warn("❌ Unlock failed:", err);
+        setUnlocked(false); // Optionally handle failure
+      });
   }
 };
+
 
   // ---------- UI ----------
   return (

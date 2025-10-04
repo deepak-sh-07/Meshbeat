@@ -1,15 +1,7 @@
-// server.js
-console.log("🚀 Starting server...");
-console.log("📦 Full Environment Variables:", process.env);
-console.log("📦 PORT provided by Railway:", process.env.PORT);
 
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-
-// Check required AWS env variables
-console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "set" : "missing");
-console.log("AWS_BUCKET_NAME:", process.env.AWS_BUCKET_NAME ? "set" : "missing");
 
 // Use Railway's dynamic port
 const PORT = process.env.PORT;
