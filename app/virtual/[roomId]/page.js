@@ -16,7 +16,7 @@ export default function Virtual() {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [ishost, setIshost] = useState(false);
-
+  const [unlocked, setUnlocked] = useState(false);
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
@@ -73,6 +73,16 @@ export default function Virtual() {
       console.error("Fetch Tracks Error:", err);
     }
   };
+  const unlockAudio = () => {
+  if (audioRef.current) {
+    audioRef.current.muted = true;
+    audioRef.current.play().then(() => {
+      audioRef.current.pause();
+      audioRef.current.muted = false;
+      setUnlocked(true);
+    });
+  }
+};
 
   // Fetch room info
   const fetchRoomInfo = async () => {
@@ -298,6 +308,14 @@ export default function Virtual() {
   // ---------- UI ----------
   return (
     <div className={styles.container}>
+       {!unlocked && (
+  <div className={styles.unlock}>
+    <button 
+      onClick={unlockAudio}>
+      Start Listening
+    </button>
+  </div>
+)}
       <div className={styles.top}>
         <button>
           <img src="/back.svg" alt="" />
