@@ -51,6 +51,7 @@ export default function Virtual() {
         console.warn("Track not found:", index);
         return;
       }
+      console.log("info is here",index, progress,plannedStart);
       playTrack(index, progress, plannedStart);
     });
 
