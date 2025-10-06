@@ -2,3 +2,11 @@
     margin: 0px;
     padding: 0px;
 }
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: linear-gradient(to bottom right, #191b20, #26282c);
+  color: #f8fafc;
+  transition: background 0.4s ease;
+}
+
