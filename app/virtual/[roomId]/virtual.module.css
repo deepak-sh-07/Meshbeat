@@ -175,6 +175,7 @@ body {
 .side ul li {
   cursor: pointer;
   padding-top: 22px;
+  margin-left: 45px;
   font-size: 30px;
 
 }

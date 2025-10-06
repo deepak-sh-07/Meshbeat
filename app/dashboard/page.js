@@ -8,16 +8,11 @@ export default function Dashboard() {
   const router = useRouter();
 
   // While checking the session, you might want to show a loader
-  if (status === "loading") {
-    return <p>Loading...</p>;
-  }
-
-  // If not logged in, redirect to /login
-  if (!session) {
-    router.push("/login");
-    return null; // Prevents flashing content
-  }
-
+   useEffect(() => {
+    if (status === "loading") return; // wait for session
+    if (!session) router.push("/login");
+  }, [session, status, router]);
+  if (!session) return null;
   return (
     <>
       <div className={styles.container}>
