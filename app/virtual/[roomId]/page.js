@@ -378,7 +378,7 @@ const unlockAudio = () => {
           step="0.1"
           onInput={handleSeek}
         />
-        <div>
+        <div className={styles.format}>
           {formatTime(progress)} / {formatTime(duration)}
         </div>
       </div>

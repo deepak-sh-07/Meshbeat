@@ -3,58 +3,75 @@ body {
   padding: 0px;
   font-family: "Poppins", sans-serif;
 }
+
 .container {
   height: 100vh;
   width: 100vw;
   background-color: rgb(46, 45, 45);
 }
+
 .top {
   display: flex;
   justify-content: space-between;
   padding: 10px 10px 0px 0px;
 }
+
 .top button {
   background: none;
   border: none;
   cursor: pointer;
+
 }
+
+.top img {
+  height: 42px;
+  width: 42px;
+}
+
 .title {
   color: aliceblue;
-  font-size: 20px;
+  font-size: 37px;
 }
+
 .song_info {
   height: 60%;
   width: 100%;
 }
-.newbg{
-    position: absolute;
-    width: 27%;
-    height: 60%;
-    left: 36%;
+
+.newbg {
+  position: absolute;
+  width: 27%;
+  height: 60%;
+  left: 36%;
 }
-.newbg img{
+
+.newbg img {
   height: 100%;
   width: 100%;
 }
+
 .song_btn {
   display: flex;
   justify-content: center;
   align-items: center;
 }
+
 .btn {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .stop {
-  height: 40px;
-  width: 40px;
+  height: 60px;
+  width: 60px;
   border-radius: 50%;
   background-color: red;
   display: flex;
   justify-content: center;
   align-items: center;
 }
+
 .add {
   height: 100%;
   width: 100%;
@@ -62,9 +79,10 @@ body {
   justify-content: flex-end;
   align-items: flex-end;
 }
+
 .add2 {
-  height: 40px;
-  width: 40px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   margin: 0px 10px 10px 0px;
   background-color: red;
@@ -73,14 +91,16 @@ body {
   align-items: center;
   cursor: pointer;
 }
+
 .add2 img {
-  height: 35px;
-  width: 35px;
   cursor: pointer;
+  width: 45px;
+  height: 45px;
 }
+
 .upload {
-  height: 40px;
-  width: 40px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   margin: 0px 10px 10px 0px;
   background-color: rgb(50, 255, 47);
@@ -89,21 +109,26 @@ body {
   align-items: center;
   cursor: pointer;
 }
+
 .upload img {
-  height: 35px;
-  width: 35px;
   cursor: pointer;
+  width: 45px;
+  height: 45px;
   transform: rotate(90deg);
 }
+
 .add2,
 .upload {
-  transition: transform 0.2s ease, box-shadow 0.2s ease; /* smooth effect */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* smooth effect */
 }
 
 .add2:hover,
 .upload:hover {
-  transform: scale(1.1); /* zoom slightly */
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3); /* soft shadow */
+  transform: scale(1.1);
+  /* zoom slightly */
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+  /* soft shadow */
 }
 
 /* Sidebar */
@@ -121,50 +146,63 @@ body {
   transform: translateX(100%);
   transition: transform 0.3s ease-in-out;
 }
+
 .side.open {
   transform: translateX(0);
 }
+
 .side img {
-  position: absolute;
-  top: 5px;
-  left: 10px;
   cursor: pointer;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  height: 42px;
+  width: 42px;
 }
+
 .side .title {
   display: flex;
   justify-content: center;
   align-items: center;
   margin-top: 20px;
 }
-.side ul{
+
+.side ul {
   color: aliceblue;
-  
+
 }
-.side ul li{
-  padding-top: 10px;
+
+.side ul li {
   cursor: pointer;
-  
+  padding-top: 22px;
+  font-size: 30px;
+
 }
-.btn img{
+
+.btn img {
   cursor: pointer;
+  height: 50px;
+  width: 50px;
 }
-.seekbar{
+
+.seekbar {
   margin-left: 10%;
 }
+
 .seekbar input[type="range"] {
-  -webkit-appearance: none; /* remove default styling */
+  -webkit-appearance: none;
+  /* remove default styling */
   appearance: none;
   width: 90%;
   height: 6px;
   border-radius: 5px;
-  background: linear-gradient(
-    to right,
-    #ff4757 var(--progress, 0%),
-    #555 var(--progress, 0%)
-  );
+  background: linear-gradient(to right,
+      #ff4757 var(--progress, 0%),
+      #555 var(--progress, 0%));
   outline: none;
   cursor: pointer;
 }
+
 .seekbar input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -184,28 +222,33 @@ body {
   cursor: pointer;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.5);
 }
-.seekbar div{
+
+.seekbar div {
   color: aliceblue;
 }
-.songname{
+
+.songname {
   display: flex;
   justify-content: center;
   align-items: center;
   color: aliceblue;
   margin: 5px 0px 5px 0px;
+  font-size: 32px;
 }
+
 .unlock {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.9);
+  background: rgba(0, 0, 0, 0.9);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
 }
+
 .unlock button {
   padding: 20px 40px;
   font-size: 24px;
@@ -214,4 +257,8 @@ body {
   color: white;
   border: none;
   cursor: pointer;
+}
+
+.format {
+  font-size: 25px;
 }

@@ -20,13 +20,15 @@ body{
 }
 
 .title{
-    padding-top: 80px;
+    color: #f0f8ff;
     display: flex;
     justify-content: center;
     align-items: center;
+    padding-top: 110px;
+    font-size: 46px;
     font-weight: 600;
-    font-size: 32px;
-    color: aliceblue;
+    
+
 }
 .desc{
     display: flex;
@@ -38,21 +40,18 @@ body{
     margin-top: 28px;
 }
 .inputs input {
-  height: 20px; 
-  width: 60%;
-  margin: 10px auto; 
-  display: block;
-  
-  padding: 8px 12px; 
-  border: 1px solid #444; 
-  border-radius: 6px; 
-  
-  background-color: rgb(69, 38, 39);
-  color: #f5f5f5;
-  
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s ease-in-out;
+    color: #f5f5f5;
+    background-color: #452627;
+    border: 1px solid #444;
+    border-radius: 6px;
+    outline: none;
+    width: 60%;
+    height: 36px;
+    margin: 16px auto;
+    padding: 8px 12px;
+    font-size: 20px;
+    transition: all .2s ease-in-out;
+    display: block;
 }
 
 .inputs input:focus {
@@ -61,23 +60,25 @@ body{
   background-color: rgb(60, 32, 34);
 }
 .signup button{
-  display: flex;
-  align-items: center;    /* vertically center icon + text */
-  justify-content: center;/* center content horizontally */
-  gap: 10px;              /* space between icon and text */
-  background: linear-gradient(135deg, #fc1717, #d60000);
-  height: 45px;
-  padding: 0 20px;        /* use padding instead of fixed width */
-  min-width: 227px;       /* keeps buttons reasonably wide */
-  border: none;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 500;
-  color: white;
-  cursor: pointer;
-  transition: all 0.25s ease-in-out;
-  box-sizing: border-box;
-  margin-left: 100px;
+  color: #fff;
+    cursor: pointer;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #fc1717, #d60000);
+    border: none;
+    border-radius: 29px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    min-width: 301px;
+    height: 59px;
+    margin-left: 172px;
+    padding: 0 20px;
+    font-size: 28px;
+    font-weight: 500;
+    transition: all .25s ease-in-out;
+    
+;
 }
 .signup button:hover {
   background: linear-gradient(135deg, #ff3333, #b80000);
@@ -93,6 +94,7 @@ body{
   justify-content: center;
   margin-top: 30px;
   color: rgb(195, 201, 207);
+  font-size: 24px;
 }
 .login a {
   color: rgb(255, 255, 255);

@@ -24,7 +24,7 @@ body{
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 30px;
+    font-size: 51px;
     font-weight: 600;
 }
 .d1, .d2{
@@ -32,6 +32,7 @@ body{
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 27px;
 }
 
 .buttons {
@@ -40,34 +41,36 @@ body{
   flex-direction: column;   /* stack buttons vertically */
   justify-content: center;  /* center vertically inside parent */
   align-items: center;      /* center horizontally */
-  gap: 10px;                /* space between buttons */
+  gap: 15px;                /* space between buttons */
 }
 
 
 /* Buttons */
 .buttons button {
-  display: flex;
-  align-items: center;    /* vertically center icon + text */
-  justify-content: center;/* center content horizontally */
-  gap: 10px;              /* space between icon and text */
-  background: linear-gradient(135deg, #fc1717, #d60000);
-  height: 45px;
-  padding: 0 20px;        /* use padding instead of fixed width */
-  min-width: 227px;       /* keeps buttons reasonably wide */
-  border: none;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 500;
-  color: white;
-  cursor: pointer;
-  transition: all 0.25s ease-in-out;
-  box-sizing: border-box;
+  color: #fff;
+    cursor: pointer;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #fc1717, #d60000);
+    border: none;
+    border-radius: 39px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    min-width: 383px;
+    height: 73px;
+    padding: 0 20px;
+    font-size: 29px;
+    font-weight: 500;
+    transition: all .25s ease-in-out;
+    
+
 }
 
 /* tighten and normalize the icon */
 .buttons button img {
-  width: 18px;            /* icon width */
-  height: 18px;           /* icon height */
+      width: 35px;
+    height: 35px;         /* icon height */
   display: block;         /* remove inline descender offset */
   object-fit: contain;
   margin: 0;
@@ -104,11 +107,11 @@ body{
   gap: 10px;              /* space between icon and text */
   background: linear-gradient(135deg, #fc1717, #d60000);
   padding: 0 20px;        /* use padding instead of fixed width */
-  min-width: 108px;
-    height: 31px;       /* keeps buttons reasonably wide */
+  min-width: 202px;
+  height: 54px;      /* keeps buttons reasonably wide */
   border: none;
   border-radius: 25px;
-  font-size: 16px;
+  font-size: 23px;
   font-weight: 500;
   color: white;
   cursor: pointer;
