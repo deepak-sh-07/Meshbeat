@@ -17,6 +17,7 @@ export default function Virtual() {
   const [duration, setDuration] = useState(0);
   const [ishost, setIshost] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [timeOffset, setTimeOffset] = useState(0); 
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
@@ -24,7 +25,6 @@ export default function Virtual() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { roomId } = useParams();
-  let song_name = "";
 
   // Redirect if not logged in
   useEffect(() => {
@@ -44,6 +44,19 @@ export default function Virtual() {
     socket.on("connect", () => {
       console.log("Connected to Socket.IO:", socket.id);
       socket.emit("join-room", roomId);
+
+      // ⏱ Ask for server time to calculate offset
+      const clientSend = Date.now();
+      socket.emit("getServerTime", clientSend);
+    });
+
+    // When server responds with its time
+    socket.on("serverTimeResponse", (clientSend, serverTime) => {
+      const clientReceive = Date.now();
+      const roundTrip = clientReceive - clientSend;
+      const offset = serverTime - (clientSend + roundTrip / 2);
+      setTimeOffset(offset);
+      console.log("🕒 Time offset (ms):", offset);
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
@@ -51,7 +64,7 @@ export default function Virtual() {
         console.warn("Track not found:", index);
         return;
       }
-      console.log("info is here",index, progress,plannedStart);
+      console.log("info is here", index, progress, plannedStart);
       playTrack(index, progress, plannedStart);
     });
 
@@ -73,7 +86,6 @@ export default function Virtual() {
       console.error("Fetch Tracks Error:", err);
     }
   };
-  
 
   // Fetch room info
   const fetchRoomInfo = async () => {
@@ -121,17 +133,18 @@ export default function Virtual() {
 
   // ---------- CONTROL FUNCTIONS ----------
 
-  // Play or semi-play
   const semiplay = (index, x) => {
     if (!ishost) return;
     if (tracks.length === 0) return;
     const newProgress = x === -1 ? 0 : progress;
-    const plannedStart = Date.now() + 3000; // 2s global delay
+
+    // 🔥 Use server time to plan playback
+    const plannedStart = Date.now() + timeOffset + 3000; // 3s global delay
 
     socketRef.current.emit("song-info", {
       index,
       progress: newProgress,
-      plannedStart,
+      plannedStart, // This is in SERVER time
       roomId,
     });
   };
@@ -147,28 +160,19 @@ export default function Virtual() {
     setProgress(startTime);
     setCurrentIndex(index);
 
-    const delay = Math.max(0, plannedStart - Date.now());
+    // Convert plannedStart (server time) to local time
+    const localStart = plannedStart - timeOffset;
+    const delay = Math.max(0, localStart - Date.now());
+
+    console.log(`🎵 Scheduled start in ${delay}ms`);
     setTimeout(() => {
       audio.currentTime = startTime;
       audio.play();
     }, delay);
 
     setStop(true);
-
-    // Drift correction
-    // if (audio.driftCheck) clearInterval(audio.driftCheck);
-    // audio.driftCheck = setInterval(() => {
-    //   const expected = startTime + (Date.now() - plannedStart) / 1000;
-    //   const diff = Math.abs(audio.currentTime - expected);
-    //   if (diff > 0.3 && !audio.paused) {
-    //     audio.currentTime = expected;
-    //   }
-    // }, 3000);
-
-    // audio.onended = () => clearInterval(audio.driftCheck);
   };
 
-  // Pause
   const semipause = (emit = true) => {
     if (ishost && emit) {
       socketRef.current?.emit("pause", { roomId });
@@ -180,13 +184,12 @@ export default function Virtual() {
     if (audioRef.current) audioRef.current.pause();
   };
 
-  // Next / Prev tracks
   const nextTrack = (emit = true) => {
     if (!ishost) return;
     if (tracks.length === 0) return;
 
     const next = (currentIndex + 1) % tracks.length;
-    const plannedStart = Date.now() + 2000; // 2s delay
+    const plannedStart = Date.now() + timeOffset + 2000;
 
     if (emit) {
       socketRef.current.emit("song-info", {
@@ -203,7 +206,7 @@ export default function Virtual() {
     if (tracks.length === 0) return;
 
     const prev = (currentIndex - 1 + tracks.length) % tracks.length;
-    const plannedStart = Date.now() + 2000; // 2s delay
+    const plannedStart = Date.now() + timeOffset + 2000;
 
     if (emit) {
       socketRef.current.emit("song-info", {
@@ -215,11 +218,10 @@ export default function Virtual() {
     }
   };
 
-  // Seek
   const handleSeek = (e) => {
     if (!ishost) return;
     const newProgress = parseFloat(e.target.value);
-    const plannedStart = Date.now() + 2000; // 2s delay
+    const plannedStart = Date.now() + timeOffset + 2000;
 
     socketRef.current.emit("song-info", {
       index: currentIndex,
@@ -232,99 +234,75 @@ export default function Virtual() {
   };
 
   // ---------- FILE UPLOAD ----------
-  const handleupload = (e) => {
-    setFile(Array.from(e.target.files));
-  };
+  const handleupload = (e) => setFile(Array.from(e.target.files));
 
   const uploadFile = async () => {
-  if (!ishost) return alert("Only host can upload songs");
-  if (!file || file.length === 0) return alert("Please select files");
+    if (!ishost) return alert("Only host can upload songs");
+    if (!file || file.length === 0) return alert("Please select files");
 
-  try {
-    for (let i = 0; i < file.length; i++) {
-      const f = file[i];
+    try {
+      for (let f of file) {
+        const res = await fetch(
+          `/api/upload-url?fileName=${encodeURIComponent(f.name)}&fileType=${encodeURIComponent(f.type)}&roomId=${roomId}`
+        );
+        const data = await res.json();
+        if (!data.url) throw new Error("Failed to get upload URL");
 
-      // 1️⃣ Request signed URL
-      const res = await fetch(
-        `/api/upload-url?fileName=${encodeURIComponent(f.name)}&fileType=${encodeURIComponent(f.type)}&roomId=${roomId}`
-      );
-      const data = await res.json();
-      if (!data.url) throw new Error("Failed to get upload URL");
+        const putRes = await fetch(data.url, {
+          method: "PUT",
+          headers: { "Content-Type": f.type },
+          body: f,
+        });
 
-      console.log("Pre-signed URL:", data.url);
-      // 2️⃣ Directly PUT to S3
-      const putRes = await fetch(data.url, {
-        method: "PUT",
-        headers: { "Content-Type": f.type },
-        body: f,
-      });
+        if (!putRes.ok) throw new Error("S3 upload failed");
+      }
 
-      if (!putRes.ok) throw new Error("S3 upload failed");
+      fetchTracks();
+      setFile([]);
+      alert("Upload complete ✅");
+    } catch (err) {
+      console.error("Upload Error:", err);
+      alert("Upload failed: " + err.message);
     }
+  };
 
-    // 3️⃣ Refresh tracks list
-    fetchTracks();
-    setFile([]);
-    alert("Upload complete ✅");
-  } catch (err) {
-    console.error("Upload Error:", err);
-    alert("Upload failed: " + err.message);
-  }
-};
+  const unlockAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.src = "/silencer.mp3";
+      audioRef.current.muted = true;
+      audioRef.current.play()
+        .then(() => {
+          audioRef.current.pause();
+          audioRef.current.removeAttribute("src");
+          audioRef.current.load();
+          audioRef.current.muted = false;
+          setUnlocked(true);
+        })
+        .catch((err) => {
+          console.warn("❌ Unlock failed:", err);
+          setUnlocked(false);
+        });
+    }
+  };
 
-
-  async function deleteTrack(trackId) {
-  const res = await fetch("/api/delete-track", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ trackId }),
-  });
-
-  if (res.ok) {
-    alert("Deleted from S3 + DB");
-  } else {
-    alert("Delete failed");
-  }
-}
-
-  // ---------- UI HELPERS ----------
   const formatTime = (time) => {
     if (isNaN(time)) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   };
-const unlockAudio = () => {
-  if (audioRef.current) {
-    audioRef.current.src = "/silencer.mp3"; // Set the silent track
-    audioRef.current.muted = true;
-    audioRef.current.play()
-      .then(() => {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute("src"); // Clear the source
-        audioRef.current.load(); // Reset the <audio> element
-        audioRef.current.muted = false;
-        setUnlocked(true); // Unlock audio
-      })
-      .catch(err => {
-        console.warn("❌ Unlock failed:", err);
-        setUnlocked(false); // Optionally handle failure
-      });
-  }
-};
-
 
   // ---------- UI ----------
+  let song_name = tracks[currentIndex]?.key?.split("/")[1] || "";
+
   return (
     <div className={styles.container}>
-       {!unlocked && (
-  <div className={styles.unlock}>
-    <button 
-      onClick={unlockAudio}>
-      Start Listening
-    </button>
-  </div>
-)}
+      {!unlocked && (
+        <div className={styles.unlock}>
+          <button onClick={unlockAudio}>Start Listening</button>
+        </div>
+      )}
+
       <div className={styles.top}>
         <button>
           <img src="/back.svg" alt="" />
@@ -361,14 +339,9 @@ const unlockAudio = () => {
           </div>
         )}
       </div>
-      <div className={styles.songname}>
-        {tracks.map((track,index)=>{
-          if(index===currentIndex){
-            song_name = track.key.split("/")[1];
-          }
-        })}
-        {song_name}
-      </div>
+
+      <div className={styles.songname}>{song_name}</div>
+
       <div className={styles.seekbar}>
         <input
           type="range"
@@ -388,11 +361,7 @@ const unlockAudio = () => {
           <img src="/prev.svg" alt="prev" onClick={prevTrack} />
           <div className={styles.stop}>
             {!stop ? (
-              <img
-                src="/play.svg"
-                alt="play"
-                onClick={() => semiplay(currentIndex)}
-              />
+              <img src="/play.svg" alt="play" onClick={() => semiplay(currentIndex)} />
             ) : (
               <img src="/pause.svg" alt="pause" onClick={semipause} />
             )}
@@ -407,10 +376,9 @@ const unlockAudio = () => {
         <ul>
           {tracks.map((track, index) => {
             const name = track.key.split("/")[1];
-            const shortName =
-              name.length > 15 ? name.slice(0, 15) + "..." : name;
+            const shortName = name.length > 15 ? name.slice(0, 15) + "..." : name;
             return (
-              <li key={index} onClick={() => ishost && semiplay(index,-1)}>
+              <li key={index} onClick={() => ishost && semiplay(index, -1)}>
                 {shortName}
               </li>
             );
@@ -421,4 +389,4 @@ const unlockAudio = () => {
       <audio ref={audioRef} hidden />
     </div>
   );
-} 
+}
