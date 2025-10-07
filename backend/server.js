@@ -4,10 +4,8 @@ dotenv.config();
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-// Use Railway's dynamic port OR fallback to 3001 for local testing
 const PORT = process.env.PORT || 3001;
 
-// Create simple HTTP server (for Railway health check)
 const httpServer = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("Server is running ✅");
@@ -17,7 +15,7 @@ const httpServer = createServer((req, res) => {
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "http://localhost:3000",      cc // local frontend
+      "http://localhost:3000",       // local frontend
       "https://meshbeat.vercel.app", // deployed frontend
     ],
     methods: ["GET", "POST"],

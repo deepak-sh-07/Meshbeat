@@ -34,7 +34,27 @@ export default function Virtual() {
     }
   }, [session, status, router]);
 
-  // Socket setup
+  // ---------- FETCH SERVER TIME ----------
+  const fetchServerTime = async () => {
+    try {
+      const clientSend = Date.now();
+      const res = await fetch("/api/time");
+      const serverTime = (await res.json()).time;
+      const clientReceive = Date.now();
+      const rtt = (clientReceive - clientSend) / 2; // round-trip latency
+      const offset = serverTime - (clientSend + rtt);
+      setTimeOffset(offset);
+      console.log("🕒 Time offset (ms):", offset);
+    } catch (err) {
+      console.error("Failed to fetch server time:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchServerTime();
+  }, []);
+
+  // ---------- SOCKET SETUP ----------
   useEffect(() => {
     if (!roomId || tracks.length === 0) return;
 
@@ -44,33 +64,14 @@ export default function Virtual() {
     socket.on("connect", () => {
       console.log("Connected to Socket.IO:", socket.id);
       socket.emit("join-room", roomId);
-
-      // ⏱ Ask for server time to calculate offset
-      const clientSend = Date.now();
-      socket.emit("getServerTime", clientSend);
-    });
-
-    // When server responds with its time
-    socket.on("serverTimeResponse", (clientSend, serverTime) => {
-      const clientReceive = Date.now();
-      const roundTrip = clientReceive - clientSend;
-      const offset = serverTime - (clientSend + roundTrip / 2);
-      setTimeOffset(offset);
-      console.log("🕒 Time offset (ms):", offset);
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
-      if (!tracks[index]) {
-        console.warn("Track not found:", index);
-        return;
-      }
-      console.log("info is here", index, progress, plannedStart);
+      if (!tracks[index]) return;
       playTrack(index, progress, plannedStart);
     });
 
-    socket.on("pause", () => {
-      pauseTrack(false);
-    });
+    socket.on("pause", () => pauseTrack(false));
 
     return () => socket.disconnect();
   }, [roomId, tracks]);
@@ -125,26 +126,21 @@ export default function Virtual() {
     };
   }, [tracks]);
 
-  useEffect(() => {
-    if (ishost && progress >= duration && duration > 0) {
-      nextTrack();
-    }
+ useEffect(() => {
+    if (ishost && progress >= duration && duration > 0) nextTrack();
   }, [progress, duration]);
 
   // ---------- CONTROL FUNCTIONS ----------
+  const semiplay = (index, x = -1) => {
+    if (!ishost || tracks.length === 0) return;
 
-  const semiplay = (index, x) => {
-    if (!ishost) return;
-    if (tracks.length === 0) return;
     const newProgress = x === -1 ? 0 : progress;
-
-    // 🔥 Use server time to plan playback
-    const plannedStart = Date.now() + timeOffset + 3000; // 3s global delay
+    const plannedStart = Date.now() + timeOffset + 3000; // server-synced start
 
     socketRef.current.emit("song-info", {
       index,
       progress: newProgress,
-      plannedStart, // This is in SERVER time
+      plannedStart,
       roomId,
     });
   };
@@ -154,23 +150,33 @@ export default function Virtual() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (audio.src !== tracks[index].url) {
-      audio.src = tracks[index].url;
-    }
-    setProgress(startTime);
+    if (audio.src !== tracks[index].url) audio.src = tracks[index].url;
     setCurrentIndex(index);
 
-    // Convert plannedStart (server time) to local time
-    const localStart = plannedStart - timeOffset;
-    const delay = Math.max(0, localStart - Date.now());
+    const localPlannedStart = plannedStart - timeOffset;
+    const now = Date.now();
+    const wait = localPlannedStart - now;
 
-    console.log(`🎵 Scheduled start in ${delay}ms`);
-    setTimeout(() => {
-      audio.currentTime = startTime;
+    if (wait > 0) {
+      setTimeout(() => {
+        audio.currentTime = startTime;
+        audio.play();
+      }, wait);
+    } else {
+      audio.currentTime = startTime + (-wait / 1000);
       audio.play();
-    }, delay);
+    }
 
     setStop(true);
+
+    if (audio.driftCheck) clearInterval(audio.driftCheck);
+    audio.driftCheck = setInterval(() => {
+      const expected = startTime + (Date.now() - plannedStart + timeOffset) / 1000;
+      const diff = Math.abs(audio.currentTime - expected);
+      if (diff > 0.3 && !audio.paused) audio.currentTime = expected;
+    }, 2000);
+
+    audio.onended = () => clearInterval(audio.driftCheck);
   };
 
   const semipause = (emit = true) => {
