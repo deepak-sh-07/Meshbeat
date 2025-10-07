@@ -38,7 +38,7 @@ export default function Virtual() {
   const fetchServerTime = async () => {
     try {
       const clientSend = Date.now();
-      const res = await fetch("/api/time");
+      const res = await fetch("/api/time",{method:'GET'});
       const serverTime = (await res.json()).time;
       const clientReceive = Date.now();
       const rtt = (clientReceive - clientSend) / 2; // round-trip latency
