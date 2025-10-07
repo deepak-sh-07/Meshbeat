@@ -218,9 +218,10 @@ export default function Virtual() {
   };
 
   const schedulePlayback = (audio, startTime, plannedStart) => {
-    const localPlannedStart = plannedStart - timeOffset;
+    // plannedStart is in server time, convert to local time
     const now = Date.now();
-    const wait = localPlannedStart - now;
+    const serverNow = now + timeOffset;
+    const wait = plannedStart - serverNow;
 
     if (wait > 50) {
       // Future start - schedule it
@@ -274,7 +275,9 @@ export default function Virtual() {
     if (!ishost || tracks.length === 0) return;
 
     const newProgress = seekTo !== null ? seekTo : (index === currentIndex ? progress : 0);
-    const plannedStart = Date.now() + timeOffset + 2000; // 2s buffer for network
+    // plannedStart should be in server time
+    const serverNow = Date.now() + timeOffset;
+    const plannedStart = serverNow + 2000; // 2s buffer for network
 
     socketRef.current?.emit("song-info", {
       index,
@@ -303,7 +306,8 @@ export default function Virtual() {
     if (!ishost || tracks.length === 0) return;
 
     const next = (currentIndex + 1) % tracks.length;
-    const plannedStart = Date.now() + timeOffset + 1500;
+    const serverNow = Date.now() + timeOffset;
+    const plannedStart = serverNow + 1500;
 
     socketRef.current?.emit("song-info", {
       index: next,
@@ -317,7 +321,8 @@ export default function Virtual() {
     if (!ishost || tracks.length === 0) return;
 
     const prev = (currentIndex - 1 + tracks.length) % tracks.length;
-    const plannedStart = Date.now() + timeOffset + 1500;
+    const serverNow = Date.now() + timeOffset;
+    const plannedStart = serverNow + 1500;
 
     socketRef.current?.emit("song-info", {
       index: prev,
@@ -338,7 +343,8 @@ export default function Virtual() {
     if (handleSeek.timeout) clearTimeout(handleSeek.timeout);
     
     handleSeek.timeout = setTimeout(() => {
-      const plannedStart = Date.now() + timeOffset + 1000;
+      const serverNow = Date.now() + timeOffset;
+      const plannedStart = serverNow + 1000;
       
       socketRef.current?.emit("song-info", {
         index: currentIndex,
