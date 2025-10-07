@@ -17,10 +17,17 @@ export default function Virtual() {
   const [duration, setDuration] = useState(0);
   const [ishost, setIshost] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
-  const [timeOffset, setTimeOffset] = useState(0); 
+  const [timeOffset, setTimeOffset] = useState(0);
+  
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
+  const driftCheckRef = useRef(null);
+  const playbackStateRef = useRef({
+    startTime: 0,
+    plannedStart: 0,
+    index: -1
+  });
 
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -34,17 +41,33 @@ export default function Virtual() {
     }
   }, [session, status, router]);
 
-  // ---------- FETCH SERVER TIME ----------
+  // ---------- FETCH SERVER TIME (with multiple samples for accuracy) ----------
   const fetchServerTime = async () => {
     try {
-      const clientSend = Date.now();
-      const res = await fetch("/api/time",{method:'GET'});
-      const serverTime = (await res.json()).time;
-      const clientReceive = Date.now();
-      const rtt = (clientReceive - clientSend) / 2; // round-trip latency
-      const offset = serverTime - (clientSend + rtt);
-      setTimeOffset(offset);
-      console.log("🕒 Time offset (ms):", offset);
+      const samples = [];
+      
+      // Take 5 samples to get better accuracy
+      for (let i = 0; i < 5; i++) {
+        const clientSend = Date.now();
+        const res = await fetch("/api/time", { method: 'GET' });
+        const data = await res.json();
+        const serverTime = data.time;
+        const clientReceive = Date.now();
+        const rtt = clientReceive - clientSend;
+        const offset = serverTime - (clientSend + rtt / 2);
+        
+        samples.push({ offset, rtt });
+        
+        // Small delay between samples
+        if (i < 4) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Use the sample with lowest RTT (most accurate)
+      samples.sort((a, b) => a.rtt - b.rtt);
+      const bestSample = samples[0];
+      
+      setTimeOffset(bestSample.offset);
+      console.log("🕒 Time offset (ms):", bestSample.offset, "RTT:", bestSample.rtt);
     } catch (err) {
       console.error("Failed to fetch server time:", err);
     }
@@ -52,18 +75,31 @@ export default function Virtual() {
 
   useEffect(() => {
     fetchServerTime();
+    // Re-sync time every 5 minutes to account for drift
+    const interval = setInterval(fetchServerTime, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // ---------- SOCKET SETUP ----------
   useEffect(() => {
-    if (!roomId || tracks.length === 0) return;
+    if (!roomId) return;
 
-    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL);
+    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO:", socket.id);
       socket.emit("join-room", roomId);
+      
+      // Request current state if not host
+      if (!ishost) {
+        socket.emit("request-state", { roomId });
+      }
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
@@ -71,10 +107,24 @@ export default function Virtual() {
       playTrack(index, progress, plannedStart);
     });
 
-    socket.on("pause", () => pauseTrack(false));
+    socket.on("pause", () => pauseTrack());
+    
+    socket.on("current-state", ({ index, progress, plannedStart, isPlaying }) => {
+      if (isPlaying && tracks[index]) {
+        playTrack(index, progress, plannedStart);
+      } else {
+        setCurrentIndex(index);
+        setStop(false);
+      }
+    });
 
-    return () => socket.disconnect();
-  }, [roomId, tracks]);
+    return () => {
+      if (driftCheckRef.current) {
+        clearInterval(driftCheckRef.current);
+      }
+      socket.disconnect();
+    };
+  }, [roomId, tracks, ishost]);
 
   // Fetch tracks
   const fetchTracks = async () => {
@@ -112,32 +162,121 @@ export default function Virtual() {
 
     const updateTime = () => {
       setProgress(audio.currentTime);
-      if (audio.currentTime >= audio.duration) nextTrack();
     };
 
     const updateDuration = () => setDuration(audio.duration);
+    
+    const handleEnded = () => {
+      if (ishost) {
+        nextTrack();
+      }
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("ended", handleEnded);
     };
-  }, [tracks]);
+  }, [tracks, ishost, currentIndex]);
 
- useEffect(() => {
-    if (ishost && progress >= duration && duration > 0) nextTrack();
-  }, [progress, duration]);
+  // ---------- IMPROVED PLAY TRACK WITH BETTER SYNC ----------
+  const playTrack = (index, startTime = 0, plannedStart = Date.now()) => {
+    if (!tracks[index]) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-  // ---------- CONTROL FUNCTIONS ----------
-  const semiplay = (index, x = -1) => {
+    // Clear any existing drift check
+    if (driftCheckRef.current) {
+      clearInterval(driftCheckRef.current);
+    }
+
+    // Update playback state
+    playbackStateRef.current = {
+      startTime,
+      plannedStart,
+      index
+    };
+
+    // Load new track if needed
+    if (currentIndex !== index || audio.src !== tracks[index].url) {
+      audio.src = tracks[index].url;
+      setCurrentIndex(index);
+      
+      // Wait for audio to be ready before playing
+      audio.onloadeddata = () => {
+        schedulePlayback(audio, startTime, plannedStart);
+      };
+    } else {
+      schedulePlayback(audio, startTime, plannedStart);
+    }
+
+    setStop(true);
+  };
+
+  const schedulePlayback = (audio, startTime, plannedStart) => {
+    const localPlannedStart = plannedStart - timeOffset;
+    const now = Date.now();
+    const wait = localPlannedStart - now;
+
+    if (wait > 50) {
+      // Future start - schedule it
+      setTimeout(() => {
+        audio.currentTime = startTime;
+        audio.play().catch(e => console.error("Play error:", e));
+        startDriftCorrection(audio, startTime, plannedStart);
+      }, wait);
+    } else if (wait > -1000) {
+      // Very close to start time or slightly past - start immediately
+      audio.currentTime = startTime;
+      audio.play().catch(e => console.error("Play error:", e));
+      startDriftCorrection(audio, startTime, plannedStart);
+    } else {
+      // Significantly late - calculate catch-up position
+      const elapsed = (-wait) / 1000;
+      const catchUpTime = startTime + elapsed;
+      
+      if (catchUpTime < audio.duration) {
+        audio.currentTime = catchUpTime;
+        audio.play().catch(e => console.error("Play error:", e));
+        startDriftCorrection(audio, startTime, plannedStart);
+      }
+    }
+  };
+
+  const startDriftCorrection = (audio, startTime, plannedStart) => {
+    // More aggressive drift correction
+    driftCheckRef.current = setInterval(() => {
+      if (audio.paused) {
+        clearInterval(driftCheckRef.current);
+        return;
+      }
+      
+      const now = Date.now();
+      const serverNow = now + timeOffset;
+      const expectedTime = startTime + (serverNow - plannedStart) / 1000;
+      const actualTime = audio.currentTime;
+      const drift = expectedTime - actualTime;
+
+      // Correct if drift exceeds threshold
+      if (Math.abs(drift) > 0.25) {
+        console.log(`🔧 Correcting drift: ${drift.toFixed(3)}s`);
+        audio.currentTime = expectedTime;
+      }
+    }, 1000); // Check every second
+  };
+
+  // ---------- IMPROVED CONTROL FUNCTIONS ----------
+  const semiplay = (index, seekTo = null) => {
     if (!ishost || tracks.length === 0) return;
 
-    const newProgress = x === -1 ? 0 : progress;
-    const plannedStart = Date.now() + timeOffset + 3000; // server-synced start
+    const newProgress = seekTo !== null ? seekTo : (index === currentIndex ? progress : 0);
+    const plannedStart = Date.now() + timeOffset + 2000; // 2s buffer for network
 
-    socketRef.current.emit("song-info", {
+    socketRef.current?.emit("song-info", {
       index,
       progress: newProgress,
       plannedStart,
@@ -145,98 +284,69 @@ export default function Virtual() {
     });
   };
 
-  const playTrack = (index, startTime = 0, plannedStart = Date.now()) => {
-    if (!tracks[index]) return;
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (audio.src !== tracks[index].url) audio.src = tracks[index].url;
-    setCurrentIndex(index);
-
-    const localPlannedStart = plannedStart - timeOffset;
-    const now = Date.now();
-    const wait = localPlannedStart - now;
-
-    if (wait > 0) {
-      setTimeout(() => {
-        audio.currentTime = startTime;
-        audio.play();
-      }, wait);
-    } else {
-      audio.currentTime = startTime + (-wait / 1000);
-      audio.play();
-    }
-
-    setStop(true);
-
-    if (audio.driftCheck) clearInterval(audio.driftCheck);
-    audio.driftCheck = setInterval(() => {
-      const expected = startTime + (Date.now() - plannedStart + timeOffset) / 1000;
-      const diff = Math.abs(audio.currentTime - expected);
-      if (diff > 0.3 && !audio.paused) audio.currentTime = expected;
-    }, 2000);
-
-    audio.onended = () => clearInterval(audio.driftCheck);
-  };
-
-  const semipause = (emit = true) => {
-    if (ishost && emit) {
-      socketRef.current?.emit("pause", { roomId });
-    }
+  const semipause = () => {
+    if (!ishost) return;
+    socketRef.current?.emit("pause", { roomId });
   };
 
   const pauseTrack = () => {
     setStop(false);
-    if (audioRef.current) audioRef.current.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (driftCheckRef.current) {
+      clearInterval(driftCheckRef.current);
+    }
   };
 
-  const nextTrack = (emit = true) => {
-    if (!ishost) return;
-    if (tracks.length === 0) return;
+  const nextTrack = () => {
+    if (!ishost || tracks.length === 0) return;
 
     const next = (currentIndex + 1) % tracks.length;
-    const plannedStart = Date.now() + timeOffset + 2000;
+    const plannedStart = Date.now() + timeOffset + 1500;
 
-    if (emit) {
-      socketRef.current.emit("song-info", {
-        index: next,
-        progress: 0,
-        plannedStart,
-        roomId,
-      });
-    }
+    socketRef.current?.emit("song-info", {
+      index: next,
+      progress: 0,
+      plannedStart,
+      roomId,
+    });
   };
 
-  const prevTrack = (emit = true) => {
-    if (!ishost) return;
-    if (tracks.length === 0) return;
+  const prevTrack = () => {
+    if (!ishost || tracks.length === 0) return;
 
     const prev = (currentIndex - 1 + tracks.length) % tracks.length;
-    const plannedStart = Date.now() + timeOffset + 2000;
+    const plannedStart = Date.now() + timeOffset + 1500;
 
-    if (emit) {
-      socketRef.current.emit("song-info", {
-        index: prev,
-        progress: 0,
-        plannedStart,
-        roomId,
-      });
-    }
+    socketRef.current?.emit("song-info", {
+      index: prev,
+      progress: 0,
+      plannedStart,
+      roomId,
+    });
   };
 
   const handleSeek = (e) => {
     if (!ishost) return;
     const newProgress = parseFloat(e.target.value);
-    const plannedStart = Date.now() + timeOffset + 2000;
-
-    socketRef.current.emit("song-info", {
-      index: currentIndex,
-      progress: newProgress,
-      plannedStart,
-      roomId,
-    });
-
+    
+    // Update local progress immediately for responsiveness
     setProgress(newProgress);
+    
+    // Debounce the actual seek to avoid too many emissions
+    if (handleSeek.timeout) clearTimeout(handleSeek.timeout);
+    
+    handleSeek.timeout = setTimeout(() => {
+      const plannedStart = Date.now() + timeOffset + 1000;
+      
+      socketRef.current?.emit("song-info", {
+        index: currentIndex,
+        progress: newProgress,
+        plannedStart,
+        roomId,
+      });
+    }, 300);
   };
 
   // ---------- FILE UPLOAD ----------
@@ -355,7 +465,8 @@ export default function Virtual() {
           max={duration || 0}
           value={progress}
           step="0.1"
-          onInput={handleSeek}
+          onChange={handleSeek}
+          disabled={!ishost}
         />
         <div className={styles.format}>
           {formatTime(progress)} / {formatTime(duration)}
@@ -364,15 +475,35 @@ export default function Virtual() {
 
       <div className={styles.song_btn}>
         <div className={styles.btn}>
-          <img src="/prev.svg" alt="prev" onClick={prevTrack} />
+          <img 
+            src="/prev.svg" 
+            alt="prev" 
+            onClick={prevTrack}
+            style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
+          />
           <div className={styles.stop}>
             {!stop ? (
-              <img src="/play.svg" alt="play" onClick={() => semiplay(currentIndex)} />
+              <img 
+                src="/play.svg" 
+                alt="play" 
+                onClick={() => ishost && semiplay(currentIndex)}
+                style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
+              />
             ) : (
-              <img src="/pause.svg" alt="pause" onClick={semipause} />
+              <img 
+                src="/pause.svg" 
+                alt="pause" 
+                onClick={semipause}
+                style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
+              />
             )}
           </div>
-          <img src="/next.svg" alt="next" onClick={nextTrack} />
+          <img 
+            src="/next.svg" 
+            alt="next" 
+            onClick={nextTrack}
+            style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
+          />
         </div>
       </div>
 
@@ -384,7 +515,14 @@ export default function Virtual() {
             const name = track.key.split("/")[1];
             const shortName = name.length > 15 ? name.slice(0, 15) + "..." : name;
             return (
-              <li key={index} onClick={() => ishost && semiplay(index, -1)}>
+              <li 
+                key={index} 
+                onClick={() => ishost && semiplay(index, 0)}
+                style={{ 
+                  cursor: ishost ? 'pointer' : 'default',
+                  backgroundColor: index === currentIndex ? '#333' : 'transparent'
+                }}
+              >
                 {shortName}
               </li>
             );

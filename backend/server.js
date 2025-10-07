@@ -11,40 +11,88 @@ const httpServer = createServer((req, res) => {
   res.end("Server is running ✅");
 });
 
+// Room state management
+const roomStates = new Map();
+
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "http://localhost:3000",       // local frontend
-      "https://meshbeat.vercel.app", // deployed frontend
+      "http://localhost:3000",
+      "https://meshbeat.vercel.app",
     ],
     methods: ["GET", "POST"],
   },
+  pingInterval: 10000, // Ping clients every 10s
+  pingTimeout: 5000,   // Consider disconnected after 5s
 });
 
 // --- SOCKET EVENTS ---
 io.on("connection", (socket) => {
   console.log("⚡ User connected:", socket.id);
 
-  // --- ⏱ Time Sync ---
-  socket.on("getServerTime", (clientSentTime) => {
-    socket.emit("serverTimeResponse", clientSentTime, Date.now());
-  });
-
   // --- 🔊 Room Join ---
   socket.on("join-room", (roomId) => {
     socket.join(roomId);
     console.log(`👥 User ${socket.id} joined room ${roomId}`);
+    
+    // Send current room state to new joiner
+    const state = roomStates.get(roomId);
+    if (state && state.isPlaying) {
+      socket.emit("current-state", {
+        index: state.index,
+        progress: state.progress,
+        plannedStart: state.plannedStart,
+        isPlaying: state.isPlaying
+      });
+    }
   });
 
-  // --- 🎵 Song Info Sync (start time, progress, etc.) ---
+  // --- 🎵 Song Info Sync ---
   socket.on("song-info", ({ index, progress, plannedStart, roomId }) => {
-    io.in(roomId).emit("song-info", { index, progress, plannedStart });
+    // Store room state
+    roomStates.set(roomId, {
+      index,
+      progress,
+      plannedStart,
+      isPlaying: true,
+      lastUpdate: Date.now()
+    });
+    
+    // Broadcast to all clients in room (including sender for confirmation)
+    io.in(roomId).emit("song-info", { 
+      index, 
+      progress, 
+      plannedStart 
+    });
+    
+    console.log(`🎵 Room ${roomId}: Playing track ${index} at ${progress}s, planned start: ${plannedStart}`);
   });
 
   // --- ⏸ Pause Event ---
   socket.on("pause", ({ roomId }) => {
+    // Update room state
+    const state = roomStates.get(roomId);
+    if (state) {
+      state.isPlaying = false;
+    }
+    
     io.in(roomId).emit("pause");
+    console.log(`⏸ Room ${roomId}: Paused`);
+  });
+
+  // --- 📡 State Request (for reconnecting clients) ---
+  socket.on("request-state", ({ roomId }) => {
+    const state = roomStates.get(roomId);
+    if (state) {
+      socket.emit("current-state", {
+        index: state.index,
+        progress: state.progress,
+        plannedStart: state.plannedStart,
+        isPlaying: state.isPlaying
+      });
+      console.log(`📡 Sent state to ${socket.id} for room ${roomId}`);
+    }
   });
 
   // --- ❌ Disconnect ---
@@ -52,6 +100,19 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
+
+// Clean up old room states every 1 hour
+setInterval(() => {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  
+  for (const [roomId, state] of roomStates.entries()) {
+    if (now - state.lastUpdate > oneHour) {
+      roomStates.delete(roomId);
+      console.log(`🧹 Cleaned up inactive room: ${roomId}`);
+    }
+  }
+}, 60 * 60 * 1000); // Run every hour
 
 // --- SERVER STARTUP ---
 httpServer.listen(PORT, () => {
