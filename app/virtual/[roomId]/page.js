@@ -8,7 +8,9 @@ import { io } from "socket.io-client";
 import { useRouter } from "next/navigation";
 
 export default function Virtual() {
+  const [file, setFile] = useState([]);
   const [tracks, setTracks] = useState([]);
+  const [sidebar, setSidebar] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stop, setStop] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -16,14 +18,16 @@ export default function Virtual() {
   const [ishost, setIshost] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [timeOffset, setTimeOffset] = useState(0);
-  const [sidebar, setSidebar] = useState(false);
-  const [file, setFile] = useState([]);
-
+  
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
   const driftCheckRef = useRef(null);
-  const playbackStateRef = useRef({ startTime: 0, plannedStart: 0, index: -1 });
+  const playbackStateRef = useRef({
+    startTime: 0,
+    plannedStart: 0,
+    index: -1
+  });
 
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -32,26 +36,49 @@ export default function Virtual() {
   // Redirect if not logged in
   useEffect(() => {
     if (status === "loading") return;
-    if (!session) router.replace("/login");
+    if (!session) {
+      router.replace("/login");
+    }
   }, [session, status, router]);
 
-  // ---------- Fetch server time for offset ----------
+  // ---------- FETCH SERVER TIME (with multiple samples for accuracy) ----------
   const fetchServerTime = async () => {
     try {
       const samples = [];
+      
+      // Take 5 samples to get better accuracy
       for (let i = 0; i < 5; i++) {
-        const clientSend = Date.now();
-        const res = await fetch("/api/time", { cache: "no-store" });
+        const clientSend = performance.now();
+        const clientSendDate = Date.now();
+        const res = await fetch("/api/time", { method: 'GET', cache: 'no-store' });
         const data = await res.json();
-        const clientReceive = Date.now();
-        const offset = data.time - ((clientSend + clientReceive) / 2);
-        samples.push(offset);
-        if (i < 4) await new Promise(r => setTimeout(r, 100));
+        const serverTime = data.time;
+        const clientReceive = performance.now();
+        const clientReceiveDate = Date.now();
+        
+        const rtt = clientReceive - clientSend;
+        const midpoint = clientSendDate + (clientReceiveDate - clientSendDate) / 2;
+        const offset = serverTime - midpoint;
+        
+        samples.push({ offset, rtt });
+        
+        // Small delay between samples
+        if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
       }
-      samples.sort((a, b) => a - b);
-      const medianOffset = samples[Math.floor(samples.length / 2)];
-      setTimeOffset(medianOffset);
-      return medianOffset;
+      
+      // Filter out samples with high RTT (likely network congestion)
+      const filteredSamples = samples.filter(s => s.rtt < 1000);
+      const validSamples = filteredSamples.length > 0 ? filteredSamples : samples;
+      
+      // Use median offset for better accuracy
+      validSamples.sort((a, b) => a.offset - b.offset);
+      const medianSample = validSamples[Math.floor(validSamples.length / 2)];
+      
+      setTimeOffset(medianSample.offset);
+      console.log("🕒 Time offset (ms):", medianSample.offset, "Median RTT:", validSamples[Math.floor(validSamples.length / 2)].rtt);
+      console.log("📊 All samples:", samples.map(s => `${s.offset.toFixed(0)}ms (RTT: ${s.rtt.toFixed(0)}ms)`).join(', '));
+      
+      return medianSample.offset;
     } catch (err) {
       console.error("Failed to fetch server time:", err);
       return 0;
@@ -60,71 +87,108 @@ export default function Virtual() {
 
   useEffect(() => {
     fetchServerTime();
-    const interval = setInterval(fetchServerTime, 2 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Re-sync time more frequently for mobile devices
+    const syncInterval = setInterval(fetchServerTime, 2 * 60 * 1000); // Every 2 minutes
+    return () => clearInterval(syncInterval);
   }, []);
 
-  // ---------- Socket setup ----------
+  // ---------- SOCKET SETUP ----------
   useEffect(() => {
     if (!roomId) return;
 
-    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL, { transports: ["websocket"] });
+    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+      timeout: 10000
+    });
     socketRef.current = socket;
 
-    socket.on("connect", async () => {
-      console.log("Connected:", socket.id);
-      await fetchServerTime();
-      socket.emit("join-room", roomId);
-      if (!ishost) socket.emit("request-state", { roomId });
+    socket.on("connect", () => {
+      console.log("Connected to Socket.IO:", socket.id);
+      
+      // Re-sync time on every connect for accuracy
+      fetchServerTime().then(() => {
+        socket.emit("join-room", roomId);
+        
+        // Request current state if not host
+        if (!ishost) {
+          socket.emit("request-state", { roomId });
+        }
+      });
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
       if (!tracks[index]) return;
+      console.log("📩 Received song-info:", { index, progress, plannedStart });
       playTrack(index, progress, plannedStart);
     });
 
-    socket.on("pause", pauseTrack);
-
+    socket.on("pause", () => pauseTrack());
+    
     socket.on("current-state", ({ index, progress, plannedStart, isPlaying }) => {
-      if (isPlaying && tracks[index]) playTrack(index, progress, plannedStart);
-      else { setCurrentIndex(index); setStop(false); }
+      if (isPlaying && tracks[index]) {
+        playTrack(index, progress, plannedStart);
+      } else {
+        setCurrentIndex(index);
+        setStop(false);
+      }
     });
 
     return () => {
-      if (driftCheckRef.current) clearInterval(driftCheckRef.current);
+      if (driftCheckRef.current) {
+        clearInterval(driftCheckRef.current);
+      }
       socket.disconnect();
     };
   }, [roomId, tracks, ishost]);
 
-  // ---------- Fetch tracks & room info ----------
+  // Fetch tracks
   const fetchTracks = async () => {
     if (!roomId) return;
     try {
       const res = await fetch(`/api/tracks?roomId=${roomId}`);
       const data = await res.json();
       setTracks(data.files || []);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("Fetch Tracks Error:", err);
+    }
   };
 
+  // Fetch room info
   const fetchRoomInfo = async () => {
     if (!roomId || !session?.user?.id) return;
     try {
       const res = await fetch(`/api/rooms?rcode=${roomId}&user_id=${session.user.id}`);
       const data = await res.json();
       if (data.success) setIshost(session.user.id === data.room.hostId);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("Fetch Room Info Error:", err);
+    }
   };
 
-  useEffect(() => { fetchTracks(); fetchRoomInfo(); }, [roomId, session?.user?.id]);
-
-  // ---------- Audio listeners ----------
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    fetchTracks();
+    fetchRoomInfo();
+  }, [roomId, session?.user?.id]);
 
-    const updateTime = () => setProgress(audio.currentTime);
+  // Audio listeners
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const audio = audioRef.current;
+
+    const updateTime = () => {
+      setProgress(audio.currentTime);
+    };
+
     const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => ishost && nextTrack();
+    
+    const handleEnded = () => {
+      if (ishost) {
+        nextTrack();
+      }
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -137,42 +201,103 @@ export default function Virtual() {
     };
   }, [tracks, ishost, currentIndex]);
 
-  // ---------- Play track ----------
+  // ---------- IMPROVED PLAY TRACK WITH BETTER SYNC ----------
   const playTrack = (index, startTime = 0, plannedStart = Date.now()) => {
     if (!tracks[index]) return;
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (driftCheckRef.current) clearInterval(driftCheckRef.current);
+    // Clear any existing drift check
+    if (driftCheckRef.current) {
+      clearInterval(driftCheckRef.current);
+    }
 
-    playbackStateRef.current = { startTime, plannedStart, index };
+    // Update playback state
+    playbackStateRef.current = {
+      startTime,
+      plannedStart,
+      index
+    };
 
+    // Load new track if needed
     if (currentIndex !== index || audio.src !== tracks[index].url) {
       audio.src = tracks[index].url;
       setCurrentIndex(index);
-      audio.onloadeddata = () => schedulePlayback(audio, startTime, plannedStart);
-    } else schedulePlayback(audio, startTime, plannedStart);
+      
+      // Wait for audio to be ready before playing
+      audio.onloadeddata = () => {
+        schedulePlayback(audio, startTime, plannedStart);
+      };
+    } else {
+      schedulePlayback(audio, startTime, plannedStart);
+    }
 
     setStop(true);
   };
 
   const schedulePlayback = (audio, startTime, plannedStart) => {
-    const serverNow = Date.now() + timeOffset;
+    const now = Date.now();
+    const serverNow = now + timeOffset;
     const wait = plannedStart - serverNow;
 
-    if (wait > 50) setTimeout(() => { audio.currentTime = startTime; audio.play(); startDriftCorrection(audio, startTime, plannedStart); }, wait);
-    else if (wait > -1000) { audio.currentTime = startTime; audio.play(); startDriftCorrection(audio, startTime, plannedStart); }
-    else { const elapsed = (-wait) / 1000; const catchUp = startTime + elapsed; if (catchUp < audio.duration) { audio.currentTime = catchUp; audio.play(); startDriftCorrection(audio, startTime, plannedStart); } }
+    console.log("📊 Playback Schedule Debug:");
+    console.log("  Local time:", now);
+    console.log("  Time offset:", timeOffset);
+    console.log("  Server time:", serverNow);
+    console.log("  Planned start:", plannedStart);
+    console.log("  Wait time (ms):", wait);
+    console.log("  Is Host:", ishost);
+
+    if (wait > 50) {
+      // Future start - schedule it
+      console.log(`⏰ Scheduling playback in ${wait}ms`);
+      setTimeout(() => {
+        audio.currentTime = startTime;
+        audio.play().catch(e => console.error("Play error:", e));
+        startDriftCorrection(audio, startTime, plannedStart);
+      }, wait);
+    } else if (wait > -1000) {
+      // Very close to start time or slightly past - start immediately
+      console.log(`▶️ Starting immediately (wait: ${wait}ms)`);
+      audio.currentTime = startTime;
+      audio.play().catch(e => console.error("Play error:", e));
+      startDriftCorrection(audio, startTime, plannedStart);
+    } else {
+      // Significantly late - calculate catch-up position
+      const elapsed = (-wait) / 1000;
+      const catchUpTime = startTime + elapsed;
+      console.log(`⏩ Catching up: ${elapsed.toFixed(2)}s late, starting at ${catchUpTime.toFixed(2)}s`);
+      
+      if (catchUpTime < audio.duration) {
+        audio.currentTime = catchUpTime;
+        audio.play().catch(e => console.error("Play error:", e));
+        startDriftCorrection(audio, startTime, plannedStart);
+      }
+    }
   };
 
   const startDriftCorrection = (audio, startTime, plannedStart) => {
+    // More aggressive drift correction for mobile
     driftCheckRef.current = setInterval(() => {
-      if (audio.paused) return clearInterval(driftCheckRef.current);
-      const serverNow = Date.now() + timeOffset;
-      const expected = startTime + (serverNow - plannedStart) / 1000;
-      if (Math.abs(audio.currentTime - expected) > 0.2) audio.currentTime = expected;
-    }, 1000);
+      if (audio.paused) {
+        clearInterval(driftCheckRef.current);
+        return;
+      }
+      
+      const now = Date.now();
+      const serverNow = now + timeOffset;
+      const expectedTime = startTime + (serverNow - plannedStart) / 1000;
+      const actualTime = audio.currentTime;
+      const drift = expectedTime - actualTime;
+
+      // Correct if drift exceeds threshold (tighter for mobile)
+      if (Math.abs(drift) > 0.2) {
+        console.log(`🔧 Correcting drift: ${drift.toFixed(3)}s (expected: ${expectedTime.toFixed(2)}s, actual: ${actualTime.toFixed(2)}s)`);
+        audio.currentTime = expectedTime;
+      }
+    }, 1000); // Check every second
   };
+
   // ---------- IMPROVED CONTROL FUNCTIONS ----------
   const semiplay = (index, seekTo = null) => {
     if (!ishost || tracks.length === 0) return;
@@ -181,6 +306,11 @@ export default function Virtual() {
     // plannedStart should be in server time
     const serverNow = Date.now() + timeOffset;
     const plannedStart = serverNow + 2000; // 2s buffer for network
+
+    console.log("🎵 Host emitting song-info:");
+    console.log("  Server now:", serverNow);
+    console.log("  Planned start:", plannedStart);
+    console.log("  Time offset:", timeOffset);
 
     socketRef.current?.emit("song-info", {
       index,
