@@ -48,36 +48,48 @@ export default function Virtual() {
       
       // Take 5 samples to get better accuracy
       for (let i = 0; i < 5; i++) {
-        const clientSend = Date.now();
-        const res = await fetch("/api/time", { method: 'GET' });
+        const clientSend = performance.now();
+        const clientSendDate = Date.now();
+        const res = await fetch("/api/time", { method: 'GET', cache: 'no-store' });
         const data = await res.json();
         const serverTime = data.time;
-        const clientReceive = Date.now();
+        const clientReceive = performance.now();
+        const clientReceiveDate = Date.now();
+        
         const rtt = clientReceive - clientSend;
-        const offset = serverTime - (clientSend + rtt / 2);
+        const midpoint = clientSendDate + (clientReceiveDate - clientSendDate) / 2;
+        const offset = serverTime - midpoint;
         
         samples.push({ offset, rtt });
         
         // Small delay between samples
-        if (i < 4) await new Promise(resolve => setTimeout(resolve, 50));
+        if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      // Use the sample with lowest RTT (most accurate)
-      samples.sort((a, b) => a.rtt - b.rtt);
-      const bestSample = samples[0];
+      // Filter out samples with high RTT (likely network congestion)
+      const filteredSamples = samples.filter(s => s.rtt < 1000);
+      const validSamples = filteredSamples.length > 0 ? filteredSamples : samples;
       
-      setTimeOffset(bestSample.offset);
-      console.log("🕒 Time offset (ms):", bestSample.offset, "RTT:", bestSample.rtt);
+      // Use median offset for better accuracy
+      validSamples.sort((a, b) => a.offset - b.offset);
+      const medianSample = validSamples[Math.floor(validSamples.length / 2)];
+      
+      setTimeOffset(medianSample.offset);
+      console.log("🕒 Time offset (ms):", medianSample.offset, "Median RTT:", validSamples[Math.floor(validSamples.length / 2)].rtt);
+      console.log("📊 All samples:", samples.map(s => `${s.offset.toFixed(0)}ms (RTT: ${s.rtt.toFixed(0)}ms)`).join(', '));
+      
+      return medianSample.offset;
     } catch (err) {
       console.error("Failed to fetch server time:", err);
+      return 0;
     }
   };
 
   useEffect(() => {
     fetchServerTime();
-    // Re-sync time every 5 minutes to account for drift
-    const interval = setInterval(fetchServerTime, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Re-sync time more frequently for mobile devices
+    const syncInterval = setInterval(fetchServerTime, 2 * 60 * 1000); // Every 2 minutes
+    return () => clearInterval(syncInterval);
   }, []);
 
   // ---------- SOCKET SETUP ----------
@@ -88,22 +100,28 @@ export default function Virtual() {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 5,
+      timeout: 10000
     });
     socketRef.current = socket;
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO:", socket.id);
-      socket.emit("join-room", roomId);
       
-      // Request current state if not host
-      if (!ishost) {
-        socket.emit("request-state", { roomId });
-      }
+      // Re-sync time on every connect for accuracy
+      fetchServerTime().then(() => {
+        socket.emit("join-room", roomId);
+        
+        // Request current state if not host
+        if (!ishost) {
+          socket.emit("request-state", { roomId });
+        }
+      });
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
       if (!tracks[index]) return;
+      console.log("📩 Received song-info:", { index, progress, plannedStart });
       playTrack(index, progress, plannedStart);
     });
 
@@ -218,13 +236,21 @@ export default function Virtual() {
   };
 
   const schedulePlayback = (audio, startTime, plannedStart) => {
-    // plannedStart is in server time, convert to local time
     const now = Date.now();
     const serverNow = now + timeOffset;
     const wait = plannedStart - serverNow;
 
+    console.log("📊 Playback Schedule Debug:");
+    console.log("  Local time:", now);
+    console.log("  Time offset:", timeOffset);
+    console.log("  Server time:", serverNow);
+    console.log("  Planned start:", plannedStart);
+    console.log("  Wait time (ms):", wait);
+    console.log("  Is Host:", ishost);
+
     if (wait > 50) {
       // Future start - schedule it
+      console.log(`⏰ Scheduling playback in ${wait}ms`);
       setTimeout(() => {
         audio.currentTime = startTime;
         audio.play().catch(e => console.error("Play error:", e));
@@ -232,6 +258,7 @@ export default function Virtual() {
       }, wait);
     } else if (wait > -1000) {
       // Very close to start time or slightly past - start immediately
+      console.log(`▶️ Starting immediately (wait: ${wait}ms)`);
       audio.currentTime = startTime;
       audio.play().catch(e => console.error("Play error:", e));
       startDriftCorrection(audio, startTime, plannedStart);
@@ -239,6 +266,7 @@ export default function Virtual() {
       // Significantly late - calculate catch-up position
       const elapsed = (-wait) / 1000;
       const catchUpTime = startTime + elapsed;
+      console.log(`⏩ Catching up: ${elapsed.toFixed(2)}s late, starting at ${catchUpTime.toFixed(2)}s`);
       
       if (catchUpTime < audio.duration) {
         audio.currentTime = catchUpTime;
@@ -249,7 +277,7 @@ export default function Virtual() {
   };
 
   const startDriftCorrection = (audio, startTime, plannedStart) => {
-    // More aggressive drift correction
+    // More aggressive drift correction for mobile
     driftCheckRef.current = setInterval(() => {
       if (audio.paused) {
         clearInterval(driftCheckRef.current);
@@ -262,9 +290,9 @@ export default function Virtual() {
       const actualTime = audio.currentTime;
       const drift = expectedTime - actualTime;
 
-      // Correct if drift exceeds threshold
-      if (Math.abs(drift) > 0.25) {
-        console.log(`🔧 Correcting drift: ${drift.toFixed(3)}s`);
+      // Correct if drift exceeds threshold (tighter for mobile)
+      if (Math.abs(drift) > 0.2) {
+        console.log(`🔧 Correcting drift: ${drift.toFixed(3)}s (expected: ${expectedTime.toFixed(2)}s, actual: ${actualTime.toFixed(2)}s)`);
         audio.currentTime = expectedTime;
       }
     }, 1000); // Check every second
@@ -278,6 +306,11 @@ export default function Virtual() {
     // plannedStart should be in server time
     const serverNow = Date.now() + timeOffset;
     const plannedStart = serverNow + 2000; // 2s buffer for network
+
+    console.log("🎵 Host emitting song-info:");
+    console.log("  Server now:", serverNow);
+    console.log("  Planned start:", plannedStart);
+    console.log("  Time offset:", timeOffset);
 
     socketRef.current?.emit("song-info", {
       index,
