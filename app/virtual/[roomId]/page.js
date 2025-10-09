@@ -1,5 +1,6 @@
 "use client";
-
+import Lottie from "lottie-react";
+import coolAnimation from "@/public/animations/player-music.json";
 import styles from "./virtual.module.css";
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -18,7 +19,7 @@ export default function Virtual() {
   const [ishost, setIshost] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [timeOffset, setTimeOffset] = useState(0);
-  
+
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
@@ -45,7 +46,7 @@ export default function Virtual() {
   const fetchServerTime = async () => {
     try {
       const samples = [];
-      
+
       // Take 5 samples to get better accuracy
       for (let i = 0; i < 5; i++) {
         const clientSend = performance.now();
@@ -55,29 +56,29 @@ export default function Virtual() {
         const serverTime = data.time;
         const clientReceive = performance.now();
         const clientReceiveDate = Date.now();
-        
+
         const rtt = clientReceive - clientSend;
         const midpoint = clientSendDate + (clientReceiveDate - clientSendDate) / 2;
         const offset = serverTime - midpoint;
-        
+
         samples.push({ offset, rtt });
-        
+
         // Small delay between samples
         if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
+
       // Filter out samples with high RTT (likely network congestion)
       const filteredSamples = samples.filter(s => s.rtt < 1000);
       const validSamples = filteredSamples.length > 0 ? filteredSamples : samples;
-      
+
       // Use median offset for better accuracy
       validSamples.sort((a, b) => a.offset - b.offset);
       const medianSample = validSamples[Math.floor(validSamples.length / 2)];
-      
+
       setTimeOffset(medianSample.offset);
       console.log("🕒 Time offset (ms):", medianSample.offset, "Median RTT:", validSamples[Math.floor(validSamples.length / 2)].rtt);
       console.log("📊 All samples:", samples.map(s => `${s.offset.toFixed(0)}ms (RTT: ${s.rtt.toFixed(0)}ms)`).join(', '));
-      
+
       return medianSample.offset;
     } catch (err) {
       console.error("Failed to fetch server time:", err);
@@ -107,11 +108,11 @@ export default function Virtual() {
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO:", socket.id);
-      
+
       // Re-sync time on every connect for accuracy
       fetchServerTime().then(() => {
         socket.emit("join-room", roomId);
-        
+
         // Request current state if not host
         if (!ishost) {
           socket.emit("request-state", { roomId });
@@ -126,7 +127,7 @@ export default function Virtual() {
     });
 
     socket.on("pause", () => pauseTrack());
-    
+
     socket.on("current-state", ({ index, progress, plannedStart, isPlaying }) => {
       if (isPlaying && tracks[index]) {
         playTrack(index, progress, plannedStart);
@@ -183,7 +184,7 @@ export default function Virtual() {
     };
 
     const updateDuration = () => setDuration(audio.duration);
-    
+
     const handleEnded = () => {
       if (ishost) {
         nextTrack();
@@ -223,7 +224,7 @@ export default function Virtual() {
     if (currentIndex !== index || audio.src !== tracks[index].url) {
       audio.src = tracks[index].url;
       setCurrentIndex(index);
-      
+
       // Wait for audio to be ready before playing
       audio.onloadeddata = () => {
         schedulePlayback(audio, startTime, plannedStart);
@@ -267,7 +268,7 @@ export default function Virtual() {
       const elapsed = (-wait) / 1000;
       const catchUpTime = startTime + elapsed;
       console.log(`⏩ Catching up: ${elapsed.toFixed(2)}s late, starting at ${catchUpTime.toFixed(2)}s`);
-      
+
       if (catchUpTime < audio.duration) {
         audio.currentTime = catchUpTime;
         audio.play().catch(e => console.error("Play error:", e));
@@ -283,7 +284,7 @@ export default function Virtual() {
         clearInterval(driftCheckRef.current);
         return;
       }
-      
+
       const now = Date.now();
       const serverNow = now + timeOffset;
       const expectedTime = startTime + (serverNow - plannedStart) / 1000;
@@ -368,17 +369,17 @@ export default function Virtual() {
   const handleSeek = (e) => {
     if (!ishost) return;
     const newProgress = parseFloat(e.target.value);
-    
+
     // Update local progress immediately for responsiveness
     setProgress(newProgress);
-    
+
     // Debounce the actual seek to avoid too many emissions
     if (handleSeek.timeout) clearTimeout(handleSeek.timeout);
-    
+
     handleSeek.timeout = setTimeout(() => {
       const serverNow = Date.now() + timeOffset;
       const plannedStart = serverNow + 1000;
-      
+
       socketRef.current?.emit("song-info", {
         index: currentIndex,
         progress: newProgress,
@@ -470,8 +471,13 @@ export default function Virtual() {
 
       <div className={styles.song_info}>
         <div className={styles.newbg}>
-          <img src="/bg.jpeg" alt="" />
+          <Lottie
+            animationData={coolAnimation}
+            loop={stop}
+            speed={0.5}
+          />
         </div>
+
         {ishost && (
           <div className={styles.add}>
             <div
@@ -514,32 +520,32 @@ export default function Virtual() {
 
       <div className={styles.song_btn}>
         <div className={styles.btn}>
-          <img 
-            src="/prev.svg" 
-            alt="prev" 
+          <img
+            src="/prev.svg"
+            alt="prev"
             onClick={prevTrack}
             style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
           />
           <div className={styles.stop}>
             {!stop ? (
-              <img 
-                src="/play.svg" 
-                alt="play" 
+              <img
+                src="/play.svg"
+                alt="play"
                 onClick={() => ishost && semiplay(currentIndex)}
                 style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
               />
             ) : (
-              <img 
-                src="/pause.svg" 
-                alt="pause" 
+              <img
+                src="/pause.svg"
+                alt="pause"
                 onClick={semipause}
                 style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
               />
             )}
           </div>
-          <img 
-            src="/next.svg" 
-            alt="next" 
+          <img
+            src="/next.svg"
+            alt="next"
             onClick={nextTrack}
             style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
           />
@@ -554,10 +560,10 @@ export default function Virtual() {
             const name = track.key.split("/")[1];
             const shortName = name.length > 15 ? name.slice(0, 15) + "..." : name;
             return (
-              <li 
-                key={index} 
+              <li
+                key={index}
                 onClick={() => ishost && semiplay(index, 0)}
-                style={{ 
+                style={{
                   cursor: ishost ? 'pointer' : 'default',
                   backgroundColor: index === currentIndex ? '#333' : 'transparent'
                 }}
