@@ -565,7 +565,6 @@ export default function Virtual() {
                 onClick={() => ishost && semiplay(index, 0)}
                 style={{
                   cursor: ishost ? 'pointer' : 'default',
-                  backgroundColor: index === currentIndex ? '#333' : 'transparent'
                 }}
               >
                 {shortName}
