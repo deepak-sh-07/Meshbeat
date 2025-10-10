@@ -9,7 +9,7 @@ body {
   width: 100vw;
   background-image: url("/virtual-bg.png");
   background-size: cover;
- background-repeat: no-repeat;
+  background-repeat: no-repeat;
 }
 
 .top {
@@ -32,11 +32,12 @@ body {
 
 .title {
   color: aliceblue;
-  font-size: 37px;
+  font-size: 45px;
+  margin-top: 20px;
 }
 
 .song_info {
-  height: 60%;
+  height: 57%;
   width: 100%;
 }
 
@@ -264,4 +265,38 @@ body {
 
 .format {
   font-size: 25px;
+}
+
+.exit_btn {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.exit_btn button {
+  color: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #fc1717, #d60000);
+  border: none;
+  border-radius: 34px;
+  margin: auto 10px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 66px;
+  padding: 0 20px;
+  font-size: 25px;
+  font-weight: 500;
+  transition: all .25s ease-in-out;
+  display: flex;
+}
+
+.exit_btn button:hover {
+  background: linear-gradient(135deg, #ff3333, #b80000);
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.exit_btn button:active {
+  transform: scale(0.96);
 }

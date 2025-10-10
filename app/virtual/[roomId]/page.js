@@ -202,6 +202,15 @@ export default function Virtual() {
     };
   }, [tracks, ishost, currentIndex]);
 
+//   useEffect(() => {
+//   if (unlocked && tracks.length > 0 && audioRef.current) {
+//     const audio = audioRef.current;
+//     audio.src = tracks[0].url;
+//     audio.preload = "auto";
+//     audio.load();
+//     console.log("✅ First track loaded for everyone:", tracks[0].url);
+//   }
+// }, [unlocked, tracks]);
   // ---------- IMPROVED PLAY TRACK WITH BETTER SYNC ----------
   const playTrack = (index, startTime = 0, plannedStart = Date.now()) => {
     if (!tracks[index]) return;
@@ -422,24 +431,30 @@ export default function Virtual() {
     }
   };
 
-  const unlockAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.src = "/silencer.mp3";
-      audioRef.current.muted = true;
-      audioRef.current.play()
-        .then(() => {
-          audioRef.current.pause();
-          audioRef.current.removeAttribute("src");
-          audioRef.current.load();
-          audioRef.current.muted = false;
-          setUnlocked(true);
-        })
-        .catch((err) => {
-          console.warn("❌ Unlock failed:", err);
-          setUnlocked(false);
-        });
-    }
-  };
+const unlockAudio = async () => {
+  if (!audioRef.current) return;
+  const audio = audioRef.current;
+
+  try {
+    // Step 1: Play silent audio to unlock autoplay
+    audio.src = "/silencer.mp3";
+    audio.muted = true;
+
+    await audio.play(); // wait for browser to allow play
+
+    // Step 2: Pause and unmute
+    audio.pause();
+    audio.muted = false;
+
+    setUnlocked(true);
+    console.log("✅ Audio unlocked, first track not touched");
+
+  } catch (err) {
+    console.warn("❌ Unlock failed:", err);
+    setUnlocked(false);
+  }
+};
+
 
   const formatTime = (time) => {
     if (isNaN(time)) return "0:00";
@@ -572,6 +587,11 @@ export default function Virtual() {
             );
           })}
         </ul>
+      </div>
+      <div className={styles.exit_btn}>
+        <button onClick={()=> {window.location.href = `/dashboard`}}>
+          Exit Room
+        </button>
       </div>
 
       <audio ref={audioRef} hidden />
