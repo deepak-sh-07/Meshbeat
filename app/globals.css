@@ -1,18 +1,21 @@
+/* Reset everything */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
+/* Prevent scrollbars completely */
+html, body, #__next {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* disables all scrollbars */
   font-family: system-ui, sans-serif;
-  background: #191b20; /* Keep static base, your AnimatedPage sets color dynamically */
+  background: #191b20; /* static base color */
   color: #3f5469;
-  overflow-x: hidden; /* prevent horizontal scroll only */
-  overflow-y: hidden;   /* allow normal page scroll */
 }
-/* globals.css */
+
+/* Background wrapper for animated pages */
 .bg-wrapper {
   background: #191b20; /* fallback background */
   width: 100%;
