@@ -1,13 +1,24 @@
-*{
-    margin: 0px;
-    padding: 0px;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
-  background: linear-gradient(to bottom right, #191b20, #2a2b2c);
-  color: #f8fafc;
-  transition: background 0.4s ease;
-  overflow: hidden;
+  background: #191b20; /* Keep static base, your AnimatedPage sets color dynamically */
+  color: #3f5469;
+  overflow-x: hidden; /* prevent horizontal scroll only */
+  overflow-y: hidden;   /* allow normal page scroll */
 }
-
+/* globals.css */
+.bg-wrapper {
+  background: #191b20; /* fallback background */
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -10;
+}

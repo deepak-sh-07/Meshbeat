@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import TransitionLink from "../components/TransitionLink";
 import styles from "./SignupPage.module.css";
 
 export default function SignupPage() {
@@ -10,6 +11,8 @@ export default function SignupPage() {
   const [cpassword, setCpassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const router = useRouter();
 
   const handleadd = async () => {
     setError("");
@@ -41,9 +44,9 @@ export default function SignupPage() {
         setPassword("");
         setCpassword("");
 
-        // redirect after 1.5s
+        // Smooth redirect using router.push (compatible with animation)
         setTimeout(() => {
-          window.location.href = "/login";
+          router.push("/login");
         }, 1500);
       } else {
         setError(data.error || "Something went wrong. Please try again.");
@@ -98,7 +101,7 @@ export default function SignupPage() {
         <div className={styles.last}>
           Already have an account?
           <div className={styles.login}>
-            <Link href="/login">Signin</Link>
+            <TransitionLink href="/login">Signin</TransitionLink>
           </div>
         </div>
       </div>

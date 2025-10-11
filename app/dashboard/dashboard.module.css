@@ -46,7 +46,7 @@ body{
 
 
 /* Buttons */
-.buttons button {
+.buttons a {
   color: #fff;
     cursor: pointer;
     box-sizing: border-box;
@@ -68,7 +68,7 @@ body{
 }
 
 /* tighten and normalize the icon */
-.buttons button img {
+.buttons a img {
       width: 35px;
     height: 35px;         /* icon height */
   display: block;         /* remove inline descender offset */
@@ -76,12 +76,12 @@ body{
   margin: 0;
 }
 
-.buttons button:hover {
+.buttons a:hover {
   background: linear-gradient(135deg, #ff3333, #b80000);
   transform: scale(1.08);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
-.buttons button a{
+.buttons  a{
   text-decoration: none;
   color: white;
 }

@@ -1,12 +1,12 @@
 "use client";
+
 import Lottie from "lottie-react";
 import coolAnimation from "@/public/animations/player-music.json";
 import styles from "./virtual.module.css";
 import { useState, useRef, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { io } from "socket.io-client";
-import { useRouter } from "next/navigation";
 
 export default function Virtual() {
   const [file, setFile] = useState([]);
@@ -27,7 +27,7 @@ export default function Virtual() {
   const playbackStateRef = useRef({
     startTime: 0,
     plannedStart: 0,
-    index: -1
+    index: -1,
   });
 
   const { data: session, status } = useSession();
@@ -37,115 +37,77 @@ export default function Virtual() {
   // Redirect if not logged in
   useEffect(() => {
     if (status === "loading") return;
-    if (!session) {
-      router.replace("/login");
-    }
+    if (!session) router.replace("/login");
   }, [session, status, router]);
 
-  // ---------- FETCH SERVER TIME (with multiple samples for accuracy) ----------
+  // Fetch server time
   const fetchServerTime = async () => {
     try {
       const samples = [];
-
-      // Take 5 samples to get better accuracy
       for (let i = 0; i < 5; i++) {
-        const clientSend = performance.now();
         const clientSendDate = Date.now();
-        const res = await fetch("/api/time", { method: 'GET', cache: 'no-store' });
+        const res = await fetch("/api/time", { method: "GET", cache: "no-store" });
         const data = await res.json();
         const serverTime = data.time;
-        const clientReceive = performance.now();
         const clientReceiveDate = Date.now();
-
-        const rtt = clientReceive - clientSend;
-        const midpoint = clientSendDate + (clientReceiveDate - clientSendDate) / 2;
-        const offset = serverTime - midpoint;
-
-        samples.push({ offset, rtt });
-
-        // Small delay between samples
-        if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
+        const offset = serverTime - clientReceiveDate;
+        samples.push(offset);
+        if (i < 4) await new Promise((r) => setTimeout(r, 100));
       }
-
-      // Filter out samples with high RTT (likely network congestion)
-      const filteredSamples = samples.filter(s => s.rtt < 1000);
-      const validSamples = filteredSamples.length > 0 ? filteredSamples : samples;
-
-      // Use median offset for better accuracy
-      validSamples.sort((a, b) => a.offset - b.offset);
-      const medianSample = validSamples[Math.floor(validSamples.length / 2)];
-
-      setTimeOffset(medianSample.offset);
-      console.log("🕒 Time offset (ms):", medianSample.offset, "Median RTT:", validSamples[Math.floor(validSamples.length / 2)].rtt);
-      console.log("📊 All samples:", samples.map(s => `${s.offset.toFixed(0)}ms (RTT: ${s.rtt.toFixed(0)}ms)`).join(', '));
-
-      return medianSample.offset;
+      samples.sort((a, b) => a - b);
+      setTimeOffset(samples[Math.floor(samples.length / 2)]);
     } catch (err) {
       console.error("Failed to fetch server time:", err);
-      return 0;
+      setTimeOffset(0);
     }
   };
 
   useEffect(() => {
     fetchServerTime();
-    // Re-sync time more frequently for mobile devices
-    const syncInterval = setInterval(fetchServerTime, 2 * 60 * 1000); // Every 2 minutes
+    const syncInterval = setInterval(fetchServerTime, 2 * 60 * 1000);
     return () => clearInterval(syncInterval);
   }, []);
 
-  // ---------- SOCKET SETUP ----------
+  // Socket setup
   useEffect(() => {
     if (!roomId) return;
 
     const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
-      timeout: 10000
+      timeout: 10000,
     });
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Connected to Socket.IO:", socket.id);
-
-      // Re-sync time on every connect for accuracy
-      fetchServerTime().then(() => {
-        socket.emit("join-room", roomId);
-
-        // Request current state if not host
-        if (!ishost) {
-          socket.emit("request-state", { roomId });
-        }
-      });
+      socket.emit("join-room", roomId);
+      if (!ishost) socket.emit("request-state", { roomId });
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
       if (!tracks[index]) return;
-      console.log("📩 Received song-info:", { index, progress, plannedStart });
       playTrack(index, progress, plannedStart);
     });
 
     socket.on("pause", () => pauseTrack());
 
     socket.on("current-state", ({ index, progress, plannedStart, isPlaying }) => {
-      if (isPlaying && tracks[index]) {
-        playTrack(index, progress, plannedStart);
-      } else {
+      if (isPlaying && tracks[index]) playTrack(index, progress, plannedStart);
+      else {
         setCurrentIndex(index);
         setStop(false);
       }
     });
 
     return () => {
-      if (driftCheckRef.current) {
-        clearInterval(driftCheckRef.current);
-      }
+      if (driftCheckRef.current) clearInterval(driftCheckRef.current);
       socket.disconnect();
     };
   }, [roomId, tracks, ishost]);
 
-  // Fetch tracks
+  // Fetch tracks and room info
   const fetchTracks = async () => {
     if (!roomId) return;
     try {
@@ -157,7 +119,6 @@ export default function Virtual() {
     }
   };
 
-  // Fetch room info
   const fetchRoomInfo = async () => {
     if (!roomId || !session?.user?.id) return;
     try {
@@ -179,17 +140,9 @@ export default function Virtual() {
     if (!audioRef.current) return;
     const audio = audioRef.current;
 
-    const updateTime = () => {
-      setProgress(audio.currentTime);
-    };
-
+    const updateTime = () => setProgress(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
-
-    const handleEnded = () => {
-      if (ishost) {
-        nextTrack();
-      }
-    };
+    const handleEnded = () => ishost && nextTrack();
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -202,45 +155,20 @@ export default function Virtual() {
     };
   }, [tracks, ishost, currentIndex]);
 
-//   useEffect(() => {
-//   if (unlocked && tracks.length > 0 && audioRef.current) {
-//     const audio = audioRef.current;
-//     audio.src = tracks[0].url;
-//     audio.preload = "auto";
-//     audio.load();
-//     console.log("✅ First track loaded for everyone:", tracks[0].url);
-//   }
-// }, [unlocked, tracks]);
-  // ---------- IMPROVED PLAY TRACK WITH BETTER SYNC ----------
+  // Play / drift correction
   const playTrack = (index, startTime = 0, plannedStart = Date.now()) => {
-    if (!tracks[index]) return;
+    if (!tracks[index] || !audioRef.current) return;
     const audio = audioRef.current;
-    if (!audio) return;
 
-    // Clear any existing drift check
-    if (driftCheckRef.current) {
-      clearInterval(driftCheckRef.current);
-    }
+    if (driftCheckRef.current) clearInterval(driftCheckRef.current);
 
-    // Update playback state
-    playbackStateRef.current = {
-      startTime,
-      plannedStart,
-      index
-    };
+    playbackStateRef.current = { startTime, plannedStart, index };
 
-    // Load new track if needed
     if (currentIndex !== index || audio.src !== tracks[index].url) {
       audio.src = tracks[index].url;
       setCurrentIndex(index);
-
-      // Wait for audio to be ready before playing
-      audio.onloadeddata = () => {
-        schedulePlayback(audio, startTime, plannedStart);
-      };
-    } else {
-      schedulePlayback(audio, startTime, plannedStart);
-    }
+      audio.onloadeddata = () => schedulePlayback(audio, startTime, plannedStart);
+    } else schedulePlayback(audio, startTime, plannedStart);
 
     setStop(true);
   };
@@ -250,161 +178,77 @@ export default function Virtual() {
     const serverNow = now + timeOffset;
     const wait = plannedStart - serverNow;
 
-    console.log("📊 Playback Schedule Debug:");
-    console.log("  Local time:", now);
-    console.log("  Time offset:", timeOffset);
-    console.log("  Server time:", serverNow);
-    console.log("  Planned start:", plannedStart);
-    console.log("  Wait time (ms):", wait);
-    console.log("  Is Host:", ishost);
-
     if (wait > 50) {
-      // Future start - schedule it
-      console.log(`⏰ Scheduling playback in ${wait}ms`);
       setTimeout(() => {
         audio.currentTime = startTime;
-        audio.play().catch(e => console.error("Play error:", e));
+        audio.play().catch(console.error);
         startDriftCorrection(audio, startTime, plannedStart);
       }, wait);
     } else if (wait > -1000) {
-      // Very close to start time or slightly past - start immediately
-      console.log(`▶️ Starting immediately (wait: ${wait}ms)`);
       audio.currentTime = startTime;
-      audio.play().catch(e => console.error("Play error:", e));
+      audio.play().catch(console.error);
       startDriftCorrection(audio, startTime, plannedStart);
     } else {
-      // Significantly late - calculate catch-up position
       const elapsed = (-wait) / 1000;
       const catchUpTime = startTime + elapsed;
-      console.log(`⏩ Catching up: ${elapsed.toFixed(2)}s late, starting at ${catchUpTime.toFixed(2)}s`);
-
       if (catchUpTime < audio.duration) {
         audio.currentTime = catchUpTime;
-        audio.play().catch(e => console.error("Play error:", e));
+        audio.play().catch(console.error);
         startDriftCorrection(audio, startTime, plannedStart);
       }
     }
   };
 
   const startDriftCorrection = (audio, startTime, plannedStart) => {
-    // More aggressive drift correction for mobile
     driftCheckRef.current = setInterval(() => {
-      if (audio.paused) {
-        clearInterval(driftCheckRef.current);
-        return;
-      }
-
+      if (audio.paused) return clearInterval(driftCheckRef.current);
       const now = Date.now();
       const serverNow = now + timeOffset;
       const expectedTime = startTime + (serverNow - plannedStart) / 1000;
-      const actualTime = audio.currentTime;
-      const drift = expectedTime - actualTime;
-
-      // Correct if drift exceeds threshold (tighter for mobile)
-      if (Math.abs(drift) > 0.2) {
-        console.log(`🔧 Correcting drift: ${drift.toFixed(3)}s (expected: ${expectedTime.toFixed(2)}s, actual: ${actualTime.toFixed(2)}s)`);
-        audio.currentTime = expectedTime;
-      }
-    }, 1000); // Check every second
-  };
-
-  // ---------- IMPROVED CONTROL FUNCTIONS ----------
-  const semiplay = (index, seekTo = null) => {
-    if (!ishost || tracks.length === 0) return;
-
-    const newProgress = seekTo !== null ? seekTo : (index === currentIndex ? progress : 0);
-    // plannedStart should be in server time
-    const serverNow = Date.now() + timeOffset;
-    const plannedStart = serverNow + 2000; // 2s buffer for network
-
-    console.log("🎵 Host emitting song-info:");
-    console.log("  Server now:", serverNow);
-    console.log("  Planned start:", plannedStart);
-    console.log("  Time offset:", timeOffset);
-
-    socketRef.current?.emit("song-info", {
-      index,
-      progress: newProgress,
-      plannedStart,
-      roomId,
-    });
-  };
-
-  const semipause = () => {
-    if (!ishost) return;
-    socketRef.current?.emit("pause", { roomId });
+      const drift = expectedTime - audio.currentTime;
+      if (Math.abs(drift) > 0.2) audio.currentTime = expectedTime;
+    }, 1000);
   };
 
   const pauseTrack = () => {
     setStop(false);
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    if (driftCheckRef.current) {
-      clearInterval(driftCheckRef.current);
-    }
+    if (audioRef.current) audioRef.current.pause();
+    if (driftCheckRef.current) clearInterval(driftCheckRef.current);
   };
 
   const nextTrack = () => {
     if (!ishost || tracks.length === 0) return;
-
     const next = (currentIndex + 1) % tracks.length;
     const serverNow = Date.now() + timeOffset;
     const plannedStart = serverNow + 1500;
-
-    socketRef.current?.emit("song-info", {
-      index: next,
-      progress: 0,
-      plannedStart,
-      roomId,
-    });
+    socketRef.current?.emit("song-info", { index: next, progress: 0, plannedStart, roomId });
   };
 
   const prevTrack = () => {
     if (!ishost || tracks.length === 0) return;
-
     const prev = (currentIndex - 1 + tracks.length) % tracks.length;
     const serverNow = Date.now() + timeOffset;
     const plannedStart = serverNow + 1500;
-
-    socketRef.current?.emit("song-info", {
-      index: prev,
-      progress: 0,
-      plannedStart,
-      roomId,
-    });
+    socketRef.current?.emit("song-info", { index: prev, progress: 0, plannedStart, roomId });
   };
 
   const handleSeek = (e) => {
     if (!ishost) return;
     const newProgress = parseFloat(e.target.value);
-
-    // Update local progress immediately for responsiveness
     setProgress(newProgress);
-
-    // Debounce the actual seek to avoid too many emissions
     if (handleSeek.timeout) clearTimeout(handleSeek.timeout);
-
     handleSeek.timeout = setTimeout(() => {
       const serverNow = Date.now() + timeOffset;
       const plannedStart = serverNow + 1000;
-
-      socketRef.current?.emit("song-info", {
-        index: currentIndex,
-        progress: newProgress,
-        plannedStart,
-        roomId,
-      });
+      socketRef.current?.emit("song-info", { index: currentIndex, progress: newProgress, plannedStart, roomId });
     }, 300);
   };
 
-  // ---------- FILE UPLOAD ----------
   const handleupload = (e) => setFile(Array.from(e.target.files));
 
   const uploadFile = async () => {
     if (!ishost) return alert("Only host can upload songs");
     if (!file || file.length === 0) return alert("Please select files");
-
     try {
       for (let f of file) {
         const res = await fetch(
@@ -413,15 +257,8 @@ export default function Virtual() {
         const data = await res.json();
         if (!data.url) throw new Error("Failed to get upload URL");
 
-        const putRes = await fetch(data.url, {
-          method: "PUT",
-          headers: { "Content-Type": f.type },
-          body: f,
-        });
-
-        if (!putRes.ok) throw new Error("S3 upload failed");
+        await fetch(data.url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
       }
-
       fetchTracks();
       setFile([]);
       alert("Upload complete ✅");
@@ -431,30 +268,21 @@ export default function Virtual() {
     }
   };
 
-const unlockAudio = async () => {
-  if (!audioRef.current) return;
-  const audio = audioRef.current;
-
-  try {
-    // Step 1: Play silent audio to unlock autoplay
-    audio.src = "/silencer.mp3";
-    audio.muted = true;
-
-    await audio.play(); // wait for browser to allow play
-
-    // Step 2: Pause and unmute
-    audio.pause();
-    audio.muted = false;
-
-    setUnlocked(true);
-    console.log("✅ Audio unlocked, first track not touched");
-
-  } catch (err) {
-    console.warn("❌ Unlock failed:", err);
-    setUnlocked(false);
-  }
-};
-
+  const unlockAudio = async () => {
+    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    try {
+      audio.src = "/silencer.mp3";
+      audio.muted = true;
+      await audio.play();
+      audio.pause();
+      audio.muted = false;
+      setUnlocked(true);
+    } catch (err) {
+      console.warn("Unlock failed:", err);
+      setUnlocked(false);
+    }
+  };
 
   const formatTime = (time) => {
     if (isNaN(time)) return "0:00";
@@ -463,8 +291,7 @@ const unlockAudio = async () => {
     return `${minutes}:${seconds}`;
   };
 
-  // ---------- UI ----------
-  let song_name = tracks[currentIndex]?.key?.split("/")[1] || "";
+  const song_name = tracks[currentIndex]?.key?.split("/")[1] || "";
 
   return (
     <div className={styles.container}>
@@ -475,43 +302,29 @@ const unlockAudio = async () => {
       )}
 
       <div className={styles.top}>
-        <button>
-          <img src="/back.svg" alt="" />
+        <button onClick={() => router.push("/dashboard")}>
+          <img src="/back.svg" alt="Back" />
         </button>
         <div className={styles.title}>Virtual Room</div>
         <button onClick={() => setSidebar(true)}>
-          <img src="/side.svg" alt="" />
+          <img src="/side.svg" alt="Sidebar" />
         </button>
       </div>
 
       <div className={styles.song_info}>
         <div className={styles.newbg}>
-          <Lottie
-            animationData={coolAnimation}
-            loop={stop}
-            speed={0.5}
-          />
+          <Lottie animationData={coolAnimation} loop={stop} speed={0.5} />
         </div>
 
         {ishost && (
           <div className={styles.add}>
-            <div
-              className={styles.add2}
-              onClick={() => fileInputRef.current.click()}
-            >
+            <div className={styles.add2} onClick={() => fileInputRef.current.click()}>
               <img src="/plus.svg" alt="add" />
             </div>
-
             <div className={styles.upload} onClick={uploadFile}>
               <img src="/upload.svg" alt="upload" />
             </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: "none" }}
-              multiple
-              onChange={handleupload}
-            />
+            <input type="file" ref={fileInputRef} style={{ display: "none" }} multiple onChange={handleupload} />
           </div>
         )}
       </div>
@@ -519,15 +332,7 @@ const unlockAudio = async () => {
       <div className={styles.songname}>{song_name}</div>
 
       <div className={styles.seekbar}>
-        <input
-          type="range"
-          min="0"
-          max={duration || 0}
-          value={progress}
-          step="0.1"
-          onChange={handleSeek}
-          disabled={!ishost}
-        />
+        <input type="range" min="0" max={duration || 0} value={progress} step="0.1" onChange={handleSeek} disabled={!ishost} />
         <div className={styles.format}>
           {formatTime(progress)} / {formatTime(duration)}
         </div>
@@ -535,35 +340,15 @@ const unlockAudio = async () => {
 
       <div className={styles.song_btn}>
         <div className={styles.btn}>
-          <img
-            src="/prev.svg"
-            alt="prev"
-            onClick={prevTrack}
-            style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
-          />
+          <img src="/prev.svg" alt="prev" onClick={prevTrack} style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? "pointer" : "not-allowed" }} />
           <div className={styles.stop}>
             {!stop ? (
-              <img
-                src="/play.svg"
-                alt="play"
-                onClick={() => ishost && semiplay(currentIndex)}
-                style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
-              />
+              <img src="/play.svg" alt="play" onClick={() => ishost && playTrack(currentIndex)} style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? "pointer" : "not-allowed" }} />
             ) : (
-              <img
-                src="/pause.svg"
-                alt="pause"
-                onClick={semipause}
-                style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
-              />
+              <img src="/pause.svg" alt="pause" onClick={pauseTrack} style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? "pointer" : "not-allowed" }} />
             )}
           </div>
-          <img
-            src="/next.svg"
-            alt="next"
-            onClick={nextTrack}
-            style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? 'pointer' : 'not-allowed' }}
-          />
+          <img src="/next.svg" alt="next" onClick={nextTrack} style={{ opacity: ishost ? 1 : 0.5, cursor: ishost ? "pointer" : "not-allowed" }} />
         </div>
       </div>
 
@@ -575,23 +360,16 @@ const unlockAudio = async () => {
             const name = track.key.split("/")[1];
             const shortName = name.length > 15 ? name.slice(0, 15) + "..." : name;
             return (
-              <li
-                key={index}
-                onClick={() => ishost && semiplay(index, 0)}
-                style={{
-                  cursor: ishost ? 'pointer' : 'default',
-                }}
-              >
+              <li key={index} onClick={() => ishost && playTrack(index, 0)} style={{ cursor: ishost ? "pointer" : "default" }}>
                 {shortName}
               </li>
             );
           })}
         </ul>
       </div>
+
       <div className={styles.exit_btn}>
-        <button onClick={()=> {window.location.href = `/dashboard`}}>
-          Exit Room
-        </button>
+        <button onClick={() => router.push("/dashboard")}>Exit Room</button>
       </div>
 
       <audio ref={audioRef} hidden />

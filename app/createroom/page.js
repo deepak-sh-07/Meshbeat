@@ -3,17 +3,16 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
-import PageTransition from "../components/PageTransition";
+import TransitionLink from "../components/TransitionLink"; // still used for animated navigation
 import styles from "./room.module.css";
 
 export default function CreateRoomPage() {
-  const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useSession();
 
   const [rname, setRname] = useState("");
   const [room_id, setRoom_id] = useState("");
+  const [created, setCreated] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -21,7 +20,6 @@ export default function CreateRoomPage() {
     if (!session) router.replace("/login");
   }, [session, status, router]);
 
-  // Prevent flashing content
   if (status === "loading" || !session) return null;
 
   const generate = () => {
@@ -44,49 +42,44 @@ export default function CreateRoomPage() {
 
     const data = await res.json();
 
-    if (data.success) router.push("/dashboard");
-    else alert("Failed to create room: " + data.message);
-
-    setRname("");
-    setRoom_id("");
-  };
-
-  // Page-specific transition
-  const roomVariants = {
-    initial: { opacity: 0, y: 10, scale: 0.97 },
-    animate: { opacity: 1, y: 0, scale: 1 },
-    exit: { opacity: 0, y: -10, scale: 0.97 },
+    if (data.success) {
+      setCreated(true);
+    } else {
+      alert("Failed to create room: " + data.message);
+    }
   };
 
   return (
-    <PageTransition
-      pathname={pathname}
-      variants={roomVariants}
-      transition={{ duration: 0.42, ease: "easeInOut" }}
-      bgColor="rgb(49, 26, 27)" // ✅ red-themed transition background
-    >
-      <div className={styles.container}>
-        <div className={styles.title}>Create a Room</div>
+    <div className={styles.container}>
+      <div className={styles.title}>Create a Room</div>
 
-        <div className={styles.code}>
-          Room Name
-          <input
-            type="text"
-            placeholder="Enter room name"
-            value={rname}
-            onChange={(e) => setRname(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.generate}>
-          <div className={styles.text}>Room Code</div>
-          <button onClick={generate}>Generate</button>
-        </div>
-
-        <div className={styles.buttons}>
-          <button onClick={createroom}>Create a Room</button>
-        </div>
+      <div className={styles.code}>
+        Room Name
+        <input
+          type="text"
+          placeholder="Enter room name"
+          value={rname}
+          onChange={(e) => setRname(e.target.value)}
+        />
       </div>
-    </PageTransition>
+
+      <div className={styles.generate}>
+        <div className={styles.text}>Room Code</div>
+        <button onClick={generate}>Generate</button>
+      </div>
+
+      <div className={styles.buttons}>
+        {!created ? (
+          <button onClick={createroom}>Create a Room</button>
+        ) : (
+          <TransitionLink
+            href="/dashboard"
+            className={styles.transitionButton}
+          >
+            Go to Dashboard →
+          </TransitionLink>
+        )}
+      </div>
+    </div>
   );
 }

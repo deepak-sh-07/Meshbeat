@@ -3,10 +3,12 @@
 import styles from "./join.module.css";
 import { useState } from "react";
 import { getSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function Join() {
   const [rcode, setRcode] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleJoin = async () => {
     if (!rcode) {
@@ -17,7 +19,6 @@ export default function Join() {
     setLoading(true);
 
     try {
-      // Get logged-in user
       const session = await getSession();
       if (!session?.user?.id) {
         alert("You must be logged in to join a room");
@@ -25,7 +26,6 @@ export default function Join() {
         return;
       }
 
-      // Call API with query params
       const res = await fetch(
         `/api/rooms?rcode=${rcode}&user_id=${session.user.id}`,
         { method: "GET" }
@@ -37,7 +37,8 @@ export default function Join() {
         alert(data.message || "Failed to join room");
       } else {
         alert(`Joined room: ${data.room.name}`);
-        window.location.href = `/virtual/${rcode}`;
+        // ✅ Smooth transition using Next Router
+        router.push(`/virtual/${rcode}`);
       }
     } catch (err) {
       console.error("Join error:", err);
@@ -63,7 +64,7 @@ export default function Join() {
       <div className={styles.input}>
         <input
           type="text"
-          placeholder="E. G. 123456"
+          placeholder="E.g. 123456"
           value={rcode}
           onChange={(e) => setRcode(e.target.value)}
         />

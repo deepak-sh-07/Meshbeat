@@ -1,13 +1,15 @@
 "use client";
+
 import { signIn, getSession } from "next-auth/react";
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import styles from "./LoginPage.module.css";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -18,7 +20,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 1️⃣ Sign in without automatic redirect
       const result = await signIn("credentials", {
         email,
         password,
@@ -31,7 +32,6 @@ export default function LoginPage() {
         return;
       }
 
-      // 2️⃣ Wait a bit for the session to update
       const session = await getSession();
 
       if (!session?.user?.id) {
@@ -40,8 +40,7 @@ export default function LoginPage() {
         return;
       }
 
-      // 3️⃣ Redirect manually
-      window.location.href = "/dashboard";
+      router.push("/dashboard"); // normal navigation
     } catch (err) {
       console.error("Login error:", err);
       alert("An error occurred. Please try again.");
@@ -78,8 +77,12 @@ export default function LoginPage() {
 
         <div className={styles.last}>
           Don't have an account?
-          <div className={styles.login}>
-            <Link href="/register">Sign Up</Link>
+          <div
+            className={styles.login}
+            onClick={() => router.push("/register")} // regular push instead of TransitionLink
+            style={{ cursor: "pointer", color: "#4f83cc" }}
+          >
+            Sign Up
           </div>
         </div>
       </div>
