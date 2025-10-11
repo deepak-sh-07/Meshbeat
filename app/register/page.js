@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import TransitionLink from "../components/TransitionLink";
 import styles from "./SignupPage.module.css";
 
 export default function SignupPage() {
@@ -44,7 +43,7 @@ export default function SignupPage() {
         setPassword("");
         setCpassword("");
 
-        // Smooth redirect using router.push (compatible with animation)
+        // Smooth redirect using router.push
         setTimeout(() => {
           router.push("/login");
         }, 1500);
@@ -100,8 +99,12 @@ export default function SignupPage() {
 
         <div className={styles.last}>
           Already have an account?
-          <div className={styles.login}>
-            <TransitionLink href="/login">Signin</TransitionLink>
+          <div
+            className={styles.login}
+            onClick={() => router.push("/login")}
+            style={{ cursor: "pointer" }}
+          >
+            Sign In
           </div>
         </div>
       </div>
