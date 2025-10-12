@@ -309,36 +309,62 @@ export default function Virtual() {
 
   // Issue #8 & #24: Improved drift correction with smoother adjustments
   const startDriftCorrection = useCallback((audio, startTime, plannedStart) => {
-    if (driftCheckRef.current) {
-      clearInterval(driftCheckRef.current);
+  if (driftCheckRef.current) {
+    clearInterval(driftCheckRef.current);
+  }
+
+  let correctionTimeout;
+
+  const applySmoothCorrection = (drift) => {
+    if (!audio) return;
+    clearTimeout(correctionTimeout);
+
+    // Small drifts don't need correction
+    if (Math.abs(drift) < 0.03) return;
+
+    // Apply very small playback rate shift
+    const rate = drift > 0 ? 0.985 : 1.015;
+    audio.playbackRate = rate;
+
+    // After 1.5s, return to normal speed
+    correctionTimeout = setTimeout(() => {
+      if (audio) audio.playbackRate = 1.0;
+    }, 1500);
+  };
+
+  driftCheckRef.current = setInterval(() => {
+    // Skip correction during seek or pause
+    if (!audio || audio.paused || isSeeking) {
+      if (driftCheckRef.current) {
+        clearInterval(driftCheckRef.current);
+        driftCheckRef.current = null;
+      }
+      return;
     }
 
-    driftCheckRef.current = setInterval(() => {
-      // Issue #24: Skip drift correction during seeking
-      if (!audio || audio.paused || isSeeking) {
-        if (driftCheckRef.current) {
-          clearInterval(driftCheckRef.current);
-          driftCheckRef.current = null;
-        }
-        return;
-      }
-      
-      const now = Date.now();
-      const serverNow = now + timeOffset;
-      const expectedTime = startTime + (serverNow - plannedStart) / 1000;
-      const actualTime = audio.currentTime;
-      const drift = expectedTime - actualTime;
+    const now = Date.now();
+    const serverNow = now + timeOffset;
+    const expectedTime = startTime + (serverNow - plannedStart) / 1000;
+    const actualTime = audio.currentTime;
+    const drift = expectedTime - actualTime;
 
-      // Issue #8: More precise threshold and smoother correction
-      if (Math.abs(drift) > DRIFT_THRESHOLD) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🔧 Drift: ${drift.toFixed(3)}s`);
-        }
-        // Smooth half-correction instead of full jump
-        audio.currentTime += drift / 2;
+    if (Math.abs(drift) > 0.03) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`🎧 Smooth Drift: ${drift.toFixed(3)}s → rate=${audio.playbackRate}`);
       }
-    }, DRIFT_CHECK_INTERVAL);
-  }, [timeOffset, isSeeking]);
+      applySmoothCorrection(drift);
+    }
+  }, 3000);
+
+  // Cleanup correction timeout when new correction starts or unmounts
+  return () => {
+    clearInterval(driftCheckRef.current);
+    clearTimeout(correctionTimeout);
+    driftCheckRef.current = null;
+    if (audio) audio.playbackRate = 1.0;
+  };
+}, [timeOffset, isSeeking]);
+
 
   const pauseTrack = useCallback(() => {
     setIsPlaying(false);
