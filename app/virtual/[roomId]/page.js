@@ -350,8 +350,11 @@ export default function Virtual() {
 
     if (Math.abs(drift) > 0.03) {
       if (process.env.NODE_ENV === "development") {
-        console.log(`🎧 Smooth Drift: ${drift.toFixed(3)}s → rate=${audio.playbackRate}`);
+        console.log(`Smooth Drift: ${drift.toFixed(3)}s → rate=${audio.playbackRate}`);
       }
+
+
+
       applySmoothCorrection(drift);
     }
   }, 3000);
