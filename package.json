@@ -12,6 +12,7 @@
     "@aws-sdk/client-s3": "^3.884.0",
     "@aws-sdk/s3-request-presigner": "^3.884.0",
     "@prisma/client": "^6.16.3",
+    "@supabase/supabase-js": "^2.76.1",
     "aws-sdk": "^2.1692.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.3",

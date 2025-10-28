@@ -1,41 +1,40 @@
-// /app/api/delete-track/route.js (Next.js 13+ app router)
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+// /app/api/delete-track/route.js
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function DELETE(req) {
   try {
     const { trackId } = await req.json();
 
-    // Get track info from DB (to know S3 key)
+    // 1️⃣ Fetch the track info from DB
     const track = await prisma.track.findUnique({ where: { id: trackId } });
     if (!track) {
-      return new Response(JSON.stringify({ error: "Track not found" }), { status: 404 });
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
 
-    const key = track.s3Key; // store S3 key when uploading
+    // 2️⃣ Get stored Supabase file key/path
+    // (Replace `track.s3Key` with whatever you called it in your schema, e.g. `storagePath`)
+    const filePath = track.storagePath || track.s3Key;
+    if (!filePath) {
+      return NextResponse.json({ error: "No file path found for track" }, { status: 400 });
+    }
 
-    // Delete from S3
-    await s3.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: key,
-      })
-    );
+    // 3️⃣ Delete the file from Supabase Storage
+    const { error: deleteError } = await supabase.storage.from("songs").remove([filePath]);
+    if (deleteError) throw deleteError;
 
-    // Delete from DB
+    // 4️⃣ Delete the record from DB
     await prisma.track.delete({ where: { id: trackId } });
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: "Failed to delete track" }), { status: 500 });
+    console.error("Supabase delete error:", err);
+    return NextResponse.json({ error: "Failed to delete track" }, { status: 500 });
   }
 }

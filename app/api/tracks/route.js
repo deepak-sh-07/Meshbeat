@@ -1,14 +1,10 @@
 // app/api/tracks/route.js
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createClient } from "@supabase/supabase-js";
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function GET(req) {
   try {
@@ -19,36 +15,23 @@ export async function GET(req) {
       return Response.json({ error: "Missing roomId" }, { status: 400 });
     }
 
-    const command = new ListObjectsV2Command({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Prefix: `${roomId}/`, // only list files under this room
-    });
+    // 1️⃣ List all files inside the folder (like S3 Prefix)
+    const { data: files, error } = await supabase.storage
+      .from("Songs")
+      .list(roomId, { limit: 100, sortBy: { column: "name", order: "asc" } });
 
-    const data = await s3.send(command);
+    if (error) throw error;
 
-    const files =
-      data.Contents?.length > 0
-        ? await Promise.all(
-            data.Contents.map(async (file) => {
-              const getCommand = new GetObjectCommand({
-                Bucket: process.env.AWS_BUCKET_NAME,
-                Key: file.Key,
-              });
+    // 2️⃣ Map each file to its public URL
+    // (if your bucket is private, we'll switch this to signed URLs)
+    const fileList = files.map((file) => ({
+      key: `${roomId}/${file.name}`,
+      url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/Songs/${roomId}/${file.name}`,
+    }));
 
-              // Generate presigned GET URL (valid 1 hour)
-              const signedUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
-
-              return {
-                key: file.Key,
-                url: signedUrl,
-              };
-            })
-          )
-        : [];
-
-    return Response.json({ files });
+    return Response.json({ files: fileList });
   } catch (err) {
-    console.error("❌ List Tracks Error:", err);
+    console.error("❌ Supabase List Tracks Error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

@@ -1,22 +1,32 @@
-import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function GET() {
   try {
-    const data = await s3.send(new ListObjectsV2Command({
-      Bucket: process.env.AWS_BUCKET_NAME,
+    // List all files inside the "songs" bucket (root level)
+    const { data, error } = await supabase.storage.from("songs").list("", {
+      limit: 100, // adjust as needed
+      sortBy: { column: "name", order: "asc" },
+    });
+
+    if (error) throw error;
+
+    // Build full public URLs for each file
+    const files = data.map((file) => ({
+      name: file.name,
+      url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/songs/${file.name}`,
+      size: file.metadata?.size || file.size || 0,
+      lastModified: file.updated_at,
     }));
 
-    return Response.json({ files: data.Contents || [] });
+    return NextResponse.json({ files });
   } catch (err) {
-    console.error("S3 Debug Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("Supabase list error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

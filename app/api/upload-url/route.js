@@ -1,24 +1,9 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-function getS3Client() {
-  if (
-    !process.env.AWS_ACCESS_KEY_ID ||
-    !process.env.AWS_SECRET_ACCESS_KEY ||
-    !process.env.AWS_BUCKET_NAME ||
-    !process.env.AWS_REGION
-  ) {
-    throw new Error("Missing AWS credentials or bucket config!");
-  }
-
-  return new S3Client({
-    region: process.env.AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(req) {
   try {
@@ -28,25 +13,25 @@ export async function GET(req) {
     const roomId = searchParams.get("roomId");
 
     if (!fileName || !fileType || !roomId) {
-      return new Response(JSON.stringify({ error: "Missing params" }), { status: 400 });
+      return NextResponse.json({ error: "Missing params" }, { status: 400 });
     }
 
-    const s3 = getS3Client();
+    // Construct a full path for organization
+    const filePath = `${roomId}/${fileName}`;
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `${roomId}/${fileName}`,
-      ContentType: fileType,
-    });
+    // Generate a signed upload URL (valid for a short time)
+    const { data, error } = await supabase.storage
+      .from("Songs")
+      .createSignedUploadUrl(filePath);
 
-    const url = await getSignedUrl(s3, command, { expiresIn: 60 });
+    if (error) throw error;
 
-    return new Response(JSON.stringify({ url }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({
+  url: data.signedUrl,   // <-- renamed key
+  path: filePath,
+});
   } catch (err) {
-    console.error("Signed URL error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    console.error("Supabase signed URL error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
