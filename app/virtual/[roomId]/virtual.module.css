@@ -2,6 +2,7 @@ body {
   margin: 0px;
   padding: 0px;
   font-family: "Poppins", sans-serif;
+  overflow: hidden; /* Prevent body scroll */
 }
 
 .container {
@@ -10,6 +11,7 @@ body {
   background-image: url("/virtual-bg.png");
   background-size: cover;
   background-repeat: no-repeat;
+  overflow: hidden; /* Prevent container scroll */
 }
 
 .top {
@@ -22,7 +24,6 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-
 }
 
 .top img {
@@ -123,20 +124,17 @@ body {
 .add2,
 .upload {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  /* smooth effect */
 }
 
 .add2:hover,
 .upload:hover {
   transform: scale(1.1);
-  /* zoom slightly */
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
-  /* soft shadow */
 }
 
-/* Sidebar */
+/* Sidebar - Fixed */
 .side {
-  height: 100%;
+  height: 100vh; /* Full viewport height */
   width: 30%;
   background-color: rgb(46, 45, 45);
   position: fixed;
@@ -144,14 +142,34 @@ body {
   right: 0;
   z-index: 100;
   box-shadow: -4px 0 12px rgba(0, 0, 0, 0.6);
+  overflow-y: auto; /* Allow scrolling inside sidebar */
+  overflow-x: hidden; /* Prevent horizontal scroll */
 
-  /* hidden by default */
+  /* Hidden by default */
   transform: translateX(100%);
   transition: transform 0.3s ease-in-out;
 }
 
 .side.open {
   transform: translateX(0);
+}
+
+/* Custom scrollbar for sidebar */
+.side::-webkit-scrollbar {
+  width: 8px;
+}
+
+.side::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.side::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .side img {
@@ -172,15 +190,21 @@ body {
 
 .side ul {
   color: aliceblue;
-
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 .side ul li {
   cursor: pointer;
-  padding-top: 22px;
-  margin-left: 45px;
+  padding: 22px 20px;
+  margin-left: 25px;
   font-size: 30px;
+  transition: background 0.2s ease;
+}
 
+.side ul li:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .btn img {
@@ -195,7 +219,6 @@ body {
 
 .seekbar input[type="range"] {
   -webkit-appearance: none;
-  /* remove default styling */
   appearance: none;
   width: 90%;
   height: 6px;
@@ -299,4 +322,44 @@ body {
 
 .exit_btn button:active {
   transform: scale(0.96);
+}
+
+/* Toast notifications */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 25px;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  z-index: 10000;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.info {
+  background: #3498db;
+}
+
+.toast.success {
+  background: #2ecc71;
+}
+
+.toast.warning {
+  background: #f39c12;
+}
+
+.toast.error {
+  background: #e74c3c;
 }
