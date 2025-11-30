@@ -1,9 +1,18 @@
 // app/api/tracks/route.js
 import { createClient } from "@supabase/supabase-js";
 
+// Debug logging
+console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log("Has Anon Key:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+    },
+  }
 );
 
 export async function GET(req) {
@@ -18,23 +27,41 @@ export async function GET(req) {
     // 1️⃣ List all files inside the folder (like S3 Prefix)
     const { data: files, error } = await supabase.storage
       .from("Songs")
-      .list(roomId, { limit: 100, sortBy: { column: "name", order: "asc" } });
+      .list(roomId, { 
+        limit: 100, 
+        sortBy: { column: "name", order: "asc" } 
+      });
 
-    if (error) throw error;
+    // 2️⃣ Handle case where folder doesn't exist or is empty
+    if (error) {
+      // If folder doesn't exist, return empty array instead of error
+      if (error.message?.includes("not found") || error.message?.includes("does not exist")) {
+        console.log(`ℹ️ Room folder ${roomId} doesn't exist yet, returning empty playlist`);
+        return Response.json({ files: [] });
+      }
+      
+      console.error("❌ Supabase List Error:", error);
+      throw error;
+    }
 
-    // 2️⃣ Map each file to its public URL
-    // (if your bucket is private, we'll switch this to signed URLs)
-    const fileList = files.map((file) => ({
+    // 3️⃣ Filter out folders (only keep files) and map to URLs
+    const actualFiles = files.filter(file => file.id !== null); // folders have null id
+    
+    const fileList = actualFiles.map((file) => ({
+      id: file.id,
       key: `${roomId}/${file.name}`,
-      url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/Songs/${roomId}/${file.name}`,
+      name: file.name,
+      url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/Songs/${roomId}/${encodeURIComponent(file.name)}`,
     }));
 
+    console.log(`✅ Fetched ${fileList.length} tracks for room ${roomId}`);
     return Response.json({ files: fileList });
+    
   } catch (err) {
     console.error("❌ Supabase List Tracks Error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json(
+      { error: err.message || "Failed to fetch tracks" }, 
+      { status: 500 }
+    );
   }
 }

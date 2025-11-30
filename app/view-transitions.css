@@ -1,0 +1,219 @@
+/* Base View Transition Styles - Blurred Effect */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Blurred fade out */
+::view-transition-old(root) {
+  animation-name: blur-fade-out;
+}
+
+/* Blurred fade in */
+::view-transition-new(root) {
+  animation-name: blur-fade-in;
+}
+
+@keyframes blur-fade-out {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+
+@keyframes blur-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(15px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom animations for specific pages - All with blur */
+
+/* Login/Register pages - gentle blur slide */
+body.page-login ::view-transition-new(root),
+body.page-register ::view-transition-new(root) {
+  animation-name: blur-slide-gentle;
+  animation-duration: 0.35s;
+}
+
+body.page-login ::view-transition-old(root),
+body.page-register ::view-transition-old(root) {
+  animation-name: blur-fade-out-fast;
+}
+
+@keyframes blur-slide-gentle {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+@keyframes blur-fade-out-fast {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  to {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+/* Dashboard - blur scale effect */
+body.page-dashboard ::view-transition-new(root) {
+  animation-name: dashboard-blur-enter;
+  animation-duration: 0.45s;
+}
+
+body.page-dashboard ::view-transition-old(root) {
+  animation-name: dashboard-blur-exit;
+}
+
+@keyframes dashboard-blur-enter {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+}
+
+@keyframes dashboard-blur-exit {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.97);
+  }
+}
+
+/* Create room / Join pages - blur pop */
+body.page-createroom ::view-transition-new(root),
+body.page-join ::view-transition-new(root) {
+  animation-name: blur-pop-in;
+  animation-duration: 0.4s;
+}
+
+@keyframes blur-pop-in {
+  0% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translateY(20px) scale(0.9);
+  }
+  60% {
+    filter: blur(2px);
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Room page - blur slide horizontal */
+body.page-virtual ::view-transition-new(root) {
+  animation-name: blur-slide-right;
+  animation-duration: 0.45s;
+}
+
+body.page-virtual ::view-transition-old(root) {
+  animation-name: blur-slide-left;
+}
+
+@keyframes blur-slide-right {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateX(25px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateX(0);
+  }
+}
+
+@keyframes blur-slide-left {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateX(-15px);
+  }
+}
+
+/* Smooth cross-fade for fast navigation */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.15s;
+    animation-name: simple-fade;
+    filter: none !important; /* Remove blur for accessibility */
+  }
+  
+  @keyframes simple-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* Prevent layout shift during transitions */
+::view-transition-group(root) {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure smooth rendering with blur */
+::view-transition-old(root) {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+::view-transition-new(root) {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Optimize blur rendering */
+html {
+  view-transition-name: none;
+}
+
+body {
+  view-transition-name: none;
+  /* Enable GPU acceleration for smooth blur */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}

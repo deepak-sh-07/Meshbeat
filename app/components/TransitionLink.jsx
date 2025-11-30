@@ -1,13 +1,22 @@
 "use client";
 
-import { useTransition } from "./TransitionContext";
+import { useRouter } from "next/navigation";
 
 export default function TransitionLink({ href, children, className, ...props }) {
-  const { triggerTransition } = useTransition();
+  const router = useRouter();
 
   const handleClick = (e) => {
     e.preventDefault();
-    triggerTransition(href);
+
+    // Check if browser supports View Transitions
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        router.push(href);
+      });
+    } else {
+      // Fallback for browsers that don't support it
+      router.push(href);
+    }
   };
 
   return (

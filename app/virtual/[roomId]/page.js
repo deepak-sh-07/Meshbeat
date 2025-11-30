@@ -11,14 +11,14 @@ import { useRouter } from "next/navigation";
 
 // Constants
 const SOCKET_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const TIME_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes (Issue #10)
+const TIME_SYNC_INTERVAL = 5 * 60 * 1000;
 const DRIFT_CHECK_INTERVAL = 1000;
-const DRIFT_THRESHOLD = 0.05; // Issue #8: More precise threshold
+const DRIFT_THRESHOLD = 0.05;
 const PLAYBACK_BUFFER_MS = 2000;
 const SEEK_DEBOUNCE_MS = 300;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg"];
-const TIME_SYNC_SAMPLES = 3; // Issue #10: Reduced from 5
+const TIME_SYNC_SAMPLES = 3;
 
 export default function Virtual() {
   const [file, setFile] = useState([]);
@@ -32,18 +32,18 @@ export default function Virtual() {
   const [unlocked, setUnlocked] = useState(false);
   const [timeOffset, setTimeOffset] = useState(0);
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
-  const [isLoading, setIsLoading] = useState(true); // Issue #23
-  const [isSeeking, setIsSeeking] = useState(false); // Issue #24
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSeeking, setIsSeeking] = useState(false);
   
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const socketRef = useRef(null);
   const driftCheckRef = useRef(null);
   const seekTimeoutRef = useRef(null);
-  const toastTimeoutRef = useRef(null); // Issue #13
-  const timeSyncIntervalRef = useRef(null); // Issue #21
-  const abortControllerRef = useRef(null); // Issue #11
-  const lottieRef = useRef(null); // Issue #15
+  const toastTimeoutRef = useRef(null);
+  const timeSyncIntervalRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const lottieRef = useRef(null);
   const playbackStateRef = useRef({
     startTime: 0,
     plannedStart: 0,
@@ -51,7 +51,7 @@ export default function Virtual() {
   });
 
   const { data: session, status } = useSession({
-    required: true, // Issue #22
+    required: true,
     onUnauthenticated() {
       router.replace("/login");
     }
@@ -64,12 +64,10 @@ export default function Virtual() {
     return params.roomId || null;
   }, [params]);
 
-  // Issue #17: Early return if no roomId
   if (!roomId) {
     return <div className={styles.container}>Loading room...</div>;
   }
 
-  // Issue #13: Improved toast with cleanup
   const showToast = useCallback((message, type = "info") => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current);
@@ -80,7 +78,6 @@ export default function Virtual() {
     }, 3000);
   }, []);
 
-  // Cleanup toast on unmount
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
@@ -89,7 +86,6 @@ export default function Virtual() {
     };
   }, []);
 
-  // Issue #4 & #6: Improved time sync with error handling and failure tracking
   const fetchServerTime = useCallback(async () => {
     try {
       const samples = [];
@@ -102,7 +98,6 @@ export default function Virtual() {
           headers: { 'Cache-Control': 'no-cache' }
         });
         
-        // Issue #4: Check response status
         if (!res.ok) {
           throw new Error(`Server time API error: ${res.status}`);
         }
@@ -142,7 +137,6 @@ export default function Virtual() {
     }
   }, [showToast]);
 
-  // Issue #6: Time sync with failure tracking
   useEffect(() => {
     let failureCount = 0;
     
@@ -171,11 +165,9 @@ export default function Virtual() {
     };
   }, [fetchServerTime]);
 
-  // Issue #5 & #11: Improved fetch with abort controller and error handling
   const fetchTracks = useCallback(async () => {
     if (!roomId) return;
     
-    // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -235,7 +227,6 @@ export default function Virtual() {
     };
   }, [fetchTracks, fetchRoomInfo]);
 
-  // Issue #3: Clear old audio listeners before setting new ones
   const playTrack = useCallback((index, startTime = 0, plannedStart = Date.now()) => {
     if (!tracks[index]) return;
     const audio = audioRef.current;
@@ -253,7 +244,6 @@ export default function Virtual() {
     const newSrcPath = newSrc.startsWith('http') ? new URL(newSrc).pathname : newSrc;
 
     if (currentIndex !== index || currentSrc !== newSrcPath) {
-      // Issue #3: Clear old listener before setting new one
       audio.onloadeddata = null;
       audio.src = newSrc;
       setCurrentIndex(index);
@@ -307,67 +297,58 @@ export default function Virtual() {
     }
   }, [timeOffset, showToast]);
 
-  // Issue #8 & #24: Improved drift correction with smoother adjustments
   const startDriftCorrection = useCallback((audio, startTime, plannedStart) => {
-  if (driftCheckRef.current) {
-    clearInterval(driftCheckRef.current);
-  }
+    if (driftCheckRef.current) {
+      clearInterval(driftCheckRef.current);
+    }
 
-  let correctionTimeout;
+    let correctionTimeout;
 
-  const applySmoothCorrection = (drift) => {
-    if (!audio) return;
-    clearTimeout(correctionTimeout);
+    const applySmoothCorrection = (drift) => {
+      if (!audio) return;
+      clearTimeout(correctionTimeout);
 
-    // Small drifts don't need correction
-    if (Math.abs(drift) < 0.03) return;
+      if (Math.abs(drift) < 0.03) return;
 
-    // Apply very small playback rate shift
-    const rate = drift > 0 ? 0.985 : 1.015;
-    audio.playbackRate = rate;
+      const rate = drift > 0 ? 0.985 : 1.015;
+      audio.playbackRate = rate;
 
-    // After 1.5s, return to normal speed
-    correctionTimeout = setTimeout(() => {
+      correctionTimeout = setTimeout(() => {
+        if (audio) audio.playbackRate = 1.0;
+      }, 1500);
+    };
+
+    driftCheckRef.current = setInterval(() => {
+      if (!audio || audio.paused || isSeeking) {
+        if (driftCheckRef.current) {
+          clearInterval(driftCheckRef.current);
+          driftCheckRef.current = null;
+        }
+        return;
+      }
+
+      const now = Date.now();
+      const serverNow = now + timeOffset;
+      const expectedTime = startTime + (serverNow - plannedStart) / 1000;
+      const actualTime = audio.currentTime;
+      const drift = expectedTime - actualTime;
+
+      if (Math.abs(drift) > 0.03) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`Smooth Drift: ${drift.toFixed(3)}s → rate=${audio.playbackRate}`);
+        }
+
+        applySmoothCorrection(drift);
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(driftCheckRef.current);
+      clearTimeout(correctionTimeout);
+      driftCheckRef.current = null;
       if (audio) audio.playbackRate = 1.0;
-    }, 1500);
-  };
-
-  driftCheckRef.current = setInterval(() => {
-    // Skip correction during seek or pause
-    if (!audio || audio.paused || isSeeking) {
-      if (driftCheckRef.current) {
-        clearInterval(driftCheckRef.current);
-        driftCheckRef.current = null;
-      }
-      return;
-    }
-
-    const now = Date.now();
-    const serverNow = now + timeOffset;
-    const expectedTime = startTime + (serverNow - plannedStart) / 1000;
-    const actualTime = audio.currentTime;
-    const drift = expectedTime - actualTime;
-
-    if (Math.abs(drift) > 0.03) {
-      if (process.env.NODE_ENV === "development") {
-        console.log(`Smooth Drift: ${drift.toFixed(3)}s → rate=${audio.playbackRate}`);
-      }
-
-
-
-      applySmoothCorrection(drift);
-    }
-  }, 3000);
-
-  // Cleanup correction timeout when new correction starts or unmounts
-  return () => {
-    clearInterval(driftCheckRef.current);
-    clearTimeout(correctionTimeout);
-    driftCheckRef.current = null;
-    if (audio) audio.playbackRate = 1.0;
-  };
-}, [timeOffset, isSeeking]);
-
+    };
+  }, [timeOffset, isSeeking]);
 
   const pauseTrack = useCallback(() => {
     setIsPlaying(false);
@@ -380,7 +361,6 @@ export default function Virtual() {
     }
   }, []);
 
-  // Issue #7: Safe socket emit helper
   const safeEmit = useCallback((event, payload) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit(event, payload);
@@ -390,7 +370,6 @@ export default function Virtual() {
     }
   }, [showToast]);
 
-  // Issue #1: Removed tracks from dependencies, only roomId
   useEffect(() => {
     if (!roomId) return;
 
@@ -409,7 +388,6 @@ export default function Virtual() {
       }
       
       fetchServerTime().then(() => {
-        // Issue #26: Wait for join ack before requesting state
         socket.emit("join-room", roomId, (ack) => {
           if (ack && !ishost) {
             safeEmit("request-state", { roomId });
@@ -419,7 +397,6 @@ export default function Virtual() {
     });
 
     socket.on("song-info", ({ index, progress, plannedStart }) => {
-      // Access tracks from state via callback
       setTracks(currentTracks => {
         if (currentTracks[index]) {
           playTrack(index, progress, plannedStart);
@@ -462,7 +439,6 @@ export default function Virtual() {
     };
   }, [roomId, ishost, fetchServerTime, safeEmit, pauseTrack, playTrack, showToast]);
 
-  // Audio event listeners
   useEffect(() => {
     if (!audioRef.current) return;
     const audio = audioRef.current;
@@ -484,7 +460,6 @@ export default function Virtual() {
     };
   }, [ishost]);
 
-  // Control functions
   const semiplay = useCallback((index, seekTo = null) => {
     if (!ishost || tracks.length === 0) return;
 
@@ -506,7 +481,6 @@ export default function Virtual() {
   }, [ishost, roomId, safeEmit]);
 
   const nextTrack = useCallback(() => {
-    // Issue #19: Guard against empty playlist
     if (!ishost || tracks.length === 0) return;
 
     const next = (currentIndex + 1) % tracks.length;
@@ -522,7 +496,6 @@ export default function Virtual() {
   }, [ishost, tracks.length, currentIndex, timeOffset, roomId, safeEmit]);
 
   const prevTrack = useCallback(() => {
-    // Issue #19: Guard against empty playlist
     if (!ishost || tracks.length === 0) return;
 
     const prev = (currentIndex - 1 + tracks.length) % tracks.length;
@@ -537,7 +510,6 @@ export default function Virtual() {
     });
   }, [ishost, tracks.length, currentIndex, timeOffset, roomId, safeEmit]);
 
-  // Issue #24: Track seeking state
   const handleSeek = useCallback((e) => {
     if (!ishost) return;
     const newProgress = parseFloat(e.target.value);
@@ -583,7 +555,6 @@ export default function Virtual() {
     }, SEEK_DEBOUNCE_MS);
   }, [ishost, timeOffset, currentIndex, roomId, safeEmit, startDriftCorrection]);
 
-  // Issue #12: Clear file input after selection
   const handleupload = useCallback((e) => {
     const files = Array.from(e.target.files);
     
@@ -600,12 +571,10 @@ export default function Virtual() {
     });
     
     setFile(validFiles);
-    // Issue #12: Clear input so same file can be selected again
     e.target.value = null;
   }, [showToast]);
 
   const uploadFile = useCallback(async () => {
-    // Issue #25: Check roomId before upload
     if (!roomId) {
       showToast("Room not ready for upload", "error");
       return;
@@ -632,7 +601,6 @@ export default function Virtual() {
           
           if (!data.url) throw new Error(`Failed to get upload URL for ${f.name}`);
 
-          // Issue #20: Add Content-Length header
           const putRes = await fetch(data.url, {
             method: "PUT",
             headers: { 
@@ -706,7 +674,6 @@ export default function Virtual() {
     disabled: { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' }
   }), []);
 
-  // Issue #21: Cleanup all intervals on unmount
   useEffect(() => {
     return () => {
       if (driftCheckRef.current) clearInterval(driftCheckRef.current);
@@ -717,7 +684,6 @@ export default function Virtual() {
     };
   }, []);
 
-  // Issue #27: Cleanup on navigation
   useEffect(() => {
     const handleRouteChange = () => {
       if (socketRef.current) {
@@ -729,10 +695,19 @@ export default function Virtual() {
       }
     };
 
-    // Next.js 13+ App Router doesn't have router.events
-    // So we rely on component unmount cleanup
     return handleRouteChange;
   }, []);
+
+  // ✅ Smooth back navigation with View Transitions
+  const handleBack = () => {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        router.back();
+      });
+    } else {
+      router.back();
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -749,7 +724,7 @@ export default function Virtual() {
       )}
 
       <div className={styles.top}>
-        <button onClick={() => router.back()}>
+        <button onClick={handleBack}>
           <img src="/back.svg" alt="back" />
         </button>
         <div className={styles.title}>Virtual Room</div>
@@ -760,7 +735,6 @@ export default function Virtual() {
 
       <div className={styles.song_info}>
         <div className={styles.newbg}>
-          {/* Issue #15: Use ref for Lottie speed control */}
           <Lottie 
             lottieRef={lottieRef}
             animationData={coolAnimation} 
@@ -846,7 +820,6 @@ export default function Virtual() {
         <img onClick={() => setSidebar(false)} src="/cross.svg" alt="close" />
         <div className={styles.title}>Playlist</div>
         
-        {/* Issue #23: Loading state */}
         {isLoading ? (
           <p style={{ padding: '20px', textAlign: 'center' }}>Loading tracks...</p>
         ) : tracks.length === 0 ? (

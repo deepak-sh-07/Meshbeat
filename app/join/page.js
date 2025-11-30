@@ -37,8 +37,15 @@ export default function Join() {
         alert(data.message || "Failed to join room");
       } else {
         alert(`Joined room: ${data.room.name}`);
-        // ✅ Smooth transition using Next Router
-        router.push(`/virtual/${rcode}`);
+        
+        // ✅ Smooth transition using View Transitions API
+        if (document.startViewTransition) {
+          document.startViewTransition(() => {
+            router.push(`/virtual/${rcode}`);
+          });
+        } else {
+          router.push(`/virtual/${rcode}`);
+        }
       }
     } catch (err) {
       console.error("Join error:", err);

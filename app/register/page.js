@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./SignupPage.module.css";
@@ -43,9 +44,15 @@ export default function SignupPage() {
         setPassword("");
         setCpassword("");
 
-        // Smooth redirect using router.push
+        // Smooth redirect using View Transitions
         setTimeout(() => {
-          router.push("/login");
+          if (document.startViewTransition) {
+            document.startViewTransition(() => {
+              router.push("/login");
+            });
+          } else {
+            router.push("/login");
+          }
         }, 1500);
       } else {
         setError(data.error || "Something went wrong. Please try again.");
@@ -53,6 +60,16 @@ export default function SignupPage() {
     } catch (err) {
       setError("🚨 Server error. Please try again later.");
       console.error(err);
+    }
+  };
+
+  const handleNavigateToLogin = () => {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        router.push("/login");
+      });
+    } else {
+      router.push("/login");
     }
   };
 
@@ -101,7 +118,7 @@ export default function SignupPage() {
           Already have an account?
           <div
             className={styles.login}
-            onClick={() => router.push("/login")}
+            onClick={handleNavigateToLogin}
             style={{ cursor: "pointer" }}
           >
             Sign In

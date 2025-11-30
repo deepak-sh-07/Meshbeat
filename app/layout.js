@@ -2,8 +2,8 @@
 
 import { SessionProvider } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { TransitionProvider } from "./components/TransitionContext";
 import AnimatedPage from "./components/AnimatedPage";
+import './view-transitions.css'
 
 export default function RootLayout({ children }) {
   const [isClient, setIsClient] = useState(false);
@@ -24,12 +24,10 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         {/* Persistent background to prevent white flash */}
-        <div className="bg-wrapper fixed inset-0 -z-10" />
+        <div className="bg-wrapper fixed inset-0 -z-10" style={{ backgroundColor: "#191b20" }} />
         
         <SessionProvider>
-          <TransitionProvider>
-            <AnimatedPage>{children}</AnimatedPage>
-          </TransitionProvider>
+          <AnimatedPage>{children}</AnimatedPage>
         </SessionProvider>
       </body>
     </html>

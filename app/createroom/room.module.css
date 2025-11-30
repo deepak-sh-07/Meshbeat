@@ -107,44 +107,46 @@ body {
   margin-top: 20px;
 }
 
-.buttons button {
+/* Style both button and TransitionLink the same */
+.buttons button,
+.buttons .transitionButton {
   color: #fff;
-    cursor: pointer;
-    box-sizing: border-box;
-    background: linear-gradient(135deg, #fc1717, #d60000);
-    border: none;
-    border-radius: 37px;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    min-width: 276px;
-    height: 65px;
-    padding: 0 20px;
-    font-size: 25px;
-    font-weight: 500;
-    transition: all .25s ease-in-out;
-    display: flex
-;
+  cursor: pointer;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #fc1717, #d60000);
+  border: none;
+  border-radius: 37px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-width: 276px;
+  height: 65px;
+  padding: 0 20px;
+  font-size: 25px;
+  font-weight: 500;
+  transition: all .25s ease-in-out;
+  display: flex;
+  text-decoration: none; /* Remove underline from link */
 }
 
 /* tighten and normalize the icon */
-.buttons button img {
+.buttons button img,
+.buttons .transitionButton img {
   width: 18px;
-  /* icon width */
   height: 18px;
-  /* icon height */
   display: block;
-  /* remove inline descender offset */
   object-fit: contain;
   margin: 0;
 }
 
-.buttons button:hover {
+.buttons button:hover,
+.buttons .transitionButton:hover {
   background: linear-gradient(135deg, #ff3333, #b80000);
   transform: scale(1.08);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
-.buttons button:active {
+.buttons button:active,
+.buttons .transitionButton:active {
   transform: scale(0.96);
 }

@@ -14,7 +14,7 @@ model User {
   name              String?
   participantRoomId String?
   createdAt         DateTime @default(now())
-  hostedRoom        Room?    @relation("HostRoom")
+  hostedRooms       Room[]   @relation("HostRoom")  // Changed from Room? to Room[]
   participant       Room?    @relation("ParticipantRoom", fields: [participantRoomId], references: [id])
 
   @@map("user")
@@ -23,7 +23,7 @@ model User {
 model Room {
   id           String   @id @default(cuid())
   code         String   @unique
-  hostId       String   @unique
+  hostId       String   // No @unique - allows multiple rooms per host
   createdAt    DateTime @default(now())
   name         String
   host         User     @relation("HostRoom", fields: [hostId], references: [id])

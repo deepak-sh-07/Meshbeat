@@ -40,12 +40,29 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard"); // normal navigation
+      // Use View Transitions for smooth navigation
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          router.push("/dashboard");
+        });
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       console.error("Login error:", err);
       alert("An error occurred. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNavigateToRegister = () => {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        router.push("/register");
+      });
+    } else {
+      router.push("/register");
     }
   };
 
@@ -79,8 +96,8 @@ export default function LoginPage() {
           Don't have an account?
           <div
             className={styles.login}
-            onClick={() => router.push("/register")} // regular push instead of TransitionLink
-            style={{ cursor: "pointer", color: "#4f83cc" }}
+            onClick={handleNavigateToRegister}
+            style={{ cursor: "pointer", color: "#dee3ebff", fontWeight: "500" }}
           >
             Sign Up
           </div>
